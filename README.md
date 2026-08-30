@@ -1,89 +1,92 @@
-# Family App — MVP slice
+# Zynqora
 
-Auth, profiles, follow/mutual-follow, and a posts feed. This is the foundation
-everything else (chat, video calls, games, AI generation) will build on top of.
+Zynqora is a social-first community platform for people, circles, and digital identity.
+This project combines a social feed, profile experience, avatar uploads, AI-assisted profile imagery, and a modern community-first UI.
 
-## Structure
+Status: Preview / Launch Soon
+
+This repository is for the current preview build and local development. It is not a final production deployment and does not expose any secret keys, credentials, or private environment values.
+
+## Project structure
 
 ```
-family-app/
-├── docker-compose.yml     # Postgres for local dev
-├── backend/               # NestJS + Prisma + JWT auth
-└── frontend/              # React + Vite + TypeScript
+familyapp/
+├── backend/                # NestJS API, Prisma, auth, uploads
+├── frontend/               # React + Vite app
+├── docker-compose.yml      # Local infra setup (if used)
+├── README.md               # Project overview
+└── package.json            # Root package if needed
 ```
 
-## Run it locally
+## Features currently included
 
-### 1. Start Postgres
+- Authentication and user accounts
+- Profile page with avatar upload / generate / edit flow
+- Social feed and post cards
+- Activity and following model support
+- AI avatar generation flow with backend upload handling
+- Local preview and development environment
 
-```bash
-cd family-app
-docker compose up -d
-```
+## Preview note
 
-### 2. Backend
+This project is currently in preview mode and may include placeholder content, mock assets, styling refinements, and evolving UX details as the app moves toward launch.
+
+## Running locally
+
+### 1) Install dependencies
 
 ```bash
 cd backend
-cp .env.example .env        # edit JWT_SECRET if you want
 npm install
-npx prisma migrate dev --name init   # creates tables
+
+cd ../frontend
+npm install
+```
+
+### 2) Start the backend
+
+```bash
+cd backend
 npm run start:dev
 ```
 
-Backend runs at `http://localhost:3000/api`.
+The API should be available at the local host configuration for the project.
 
-### 3. Frontend
+### 3) Start the frontend
 
 ```bash
 cd frontend
-npm install
-npm run dev
+npm run dev -- --host 0.0.0.0
 ```
 
-Frontend runs at `http://localhost:5173`.
+Then open the frontend URL shown in the terminal, usually:
 
-## Try it
+```text
+http://localhost:5173/
+```
 
-1. Open `http://localhost:5173/signup`, create two accounts (e.g. in two
-   browser tabs — one normal, one incognito, so both sessions stay logged in).
-2. Visit `/profile/<other-username>` and click Follow from both accounts —
-   once it's mutual, that pair is unlocked for chat once you build it.
-3. Go to `/feed` and post something — it shows up because you always see
-   your own posts, plus anyone you follow.
+## Deployment note
 
-## What's already wired up, ready to build on
+The frontend is designed for deployment to static hosting services such as Netlify, Vercel, or similar.
+The backend should be deployed to a managed Node environment with its own runtime configuration.
 
-- JWT auth (`Authorization: Bearer <token>`) protecting all `/users` and `/posts` routes
-- Password hashing with bcrypt (12 salt rounds)
-- `Follow` model + `isMutual()` check in `UsersService` — this is the gate to
-  use before allowing a chat thread to open
-- `Post.visibility` enum (`CIRCLE` / `TREE` / `FOLLOWERS`) already in the
-  schema, not yet enforced in the feed query — enforce it once you add
-  family "circles" as a real grouping
-- Feed query is cursor-paginated (`nextCursor`) so it won't fall over once
-  there's real data volume
+Do not include private tokens or credentials in source control.
 
-## Next slices to build, in order
+## Sample media / visuals
 
-1. **Chat** — new `Message` model + a `chat` module; gate thread creation
-   behind `usersService.isMutual()`. Add a WebSocket gateway
-   (`@nestjs/websockets`) for realtime delivery.
-2. **Media uploads** — presigned S3 upload URLs so the frontend uploads
-   directly to storage instead of through the API.
-3. **Video calls** — integrate LiveKit or Agora rather than building WebRTC
-   signaling from scratch.
-4. **Games** — a `GameSession` WebSocket gateway, reusing the same realtime
-   infra as chat.
-5. **AI generation** — an async job queue (BullMQ + Redis) calling an
-   image/video generation API, with a moderation step before any result is
-   shown.
+The project uses safe placeholder/profile imagery and generated assets for preview purposes. Replace any sample assets with final brand assets before launch.
 
-## Notes on this sandbox environment
+## Repository notes
 
-`npx prisma generate` couldn't run in this sandbox because it needs to
-download engine binaries from `binaries.prisma.sh`, which isn't on this
-environment's network allowlist. On your own machine, with normal internet
-access, `npm install` + `npx prisma migrate dev` will work as documented
-above — this is a sandbox-only restriction, not a bug in the code. Both the
-backend and frontend TypeScript were type-checked here and compile cleanly.
+- The codebase is cleaned up for public sharing.
+- Private credentials and sensitive internal values were not included.
+- Production deployment configuration should use environment variables managed by the host platform.
+
+## Development / launch summary
+
+- Local preview works through the configured frontend and backend dev servers.
+- The app is intended to be launched publicly once branding, image assets, production configuration, and final deployment secrets are set.
+
+## Contact / ownership
+
+This project is a personal preview build for the Zynqora app and is shared for review and launch preparation.
