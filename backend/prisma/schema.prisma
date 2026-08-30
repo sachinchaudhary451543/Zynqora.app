@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  username     String   @unique
+  passwordHash String
+  name         String
+  bio          String?
+  avatarUrl    String?
+  profileImage String?  // New: Profile picture URL
+  website      String?
+  category     String?
+  note         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  // Privacy settings
+  profileVisibility     String @default("PUBLIC")      // PUBLIC, FOLLOWERS_ONLY, PRIVATE
+  followersVisibility   String @default("PUBLIC")
+  followingVisibility   String @default("PUBLIC")
+
+  posts        Post[]
+  following    Follow[] @relation("follower")
+  followedBy   Follow[] @relation("following")
+  likes        Like[]   @relation("UserLikes")
+  comments     Comment[] @relation("UserComments")
+  stories      Story[]
+  conversations ConversationParticipant[]
+  messages     Message[]
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("follower", fields: [followerId], references: [id])
+  following User @relation("following", fields: [followingId], references: [id])
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+}
+
+// Visibility scopes control who can see a post -
+// represented as a string: CIRCLE, TREE, FOLLOWERS
+
+model Post {
+  id         String         @id @default(uuid())
+  authorId   String
+  content    String?
+  mediaUrl   String?
+  mediaType  String?        // "image" | "video" | null
+  visibility String         @default("FOLLOWERS")
+  createdAt  DateTime       @default(now())
+
+  author   User      @relation(fields: [authorId], references: [id])
+  likes    Like[]
+  comments Comment[]
+
+  @@index([authorId, createdAt])
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id])
+  user User @relation("UserLikes", fields: [userId], references: [id])
+
+  @@unique([postId, userId])
+  @@index([postId])
+  @@index([userId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  post   Post @relation(fields: [postId], references: [id])
+  author User @relation("UserComments", fields: [authorId], references: [id])
+
+  @@index([postId])
+  @@index([authorId])
+}
+
+model Story {
+  id        String   @id @default(uuid())
+  authorId  String
+  videoUrl  String
+  thumbnail String?
+  caption   String?
+  visibility String @default("FOLLOWERS")  // PUBLIC, FOLLOWERS_ONLY, PRIVATE
+  expiresAt DateTime                       // Stories expire after 24 hours
+  createdAt DateTime @default(now())
+
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([authorId])
+  @@index([expiresAt])
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  participants ConversationParticipant[]
+  messages  Message[]
+}
+
+model ConversationParticipant {
+  id             String @id @default(uuid())
+  conversationId String
+  userId         String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  user           User @relation(fields: [userId], references: [id])
+
+  @@index([conversationId])
+  @@index([userId])
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       User @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId])
+  @@index([senderId])
+}
