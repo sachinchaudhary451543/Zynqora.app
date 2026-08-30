@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { AuraSparkIcon } from './Icons';
 
 interface StoryItem {
   id: string;
@@ -7,6 +8,7 @@ interface StoryItem {
   type?: string;
   authorName?: string;
   authorAvatar?: string;
+  vibe?: string;
 }
 
 interface StoryViewerModalProps {
@@ -16,6 +18,8 @@ interface StoryViewerModalProps {
 
 export default function StoryViewerModal({ story, onClose }: StoryViewerModalProps) {
   const [progress, setProgress] = useState(0);
+  const [liked, setLiked] = useState(false);
+  const [sparkEffect, setSparkEffect] = useState(false);
 
   useEffect(() => {
     if (!story) return;
@@ -27,7 +31,7 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
           onClose();
           return 100;
         }
-        return prev + 1.6;
+        return prev + 1.2;
       });
     }, 100);
 
@@ -36,56 +40,225 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
 
   if (!story) return null;
 
+  const handleSpark = (emoji: string) => {
+    setLiked(true);
+    setSparkEffect(true);
+    setTimeout(() => setSparkEffect(false), 1200);
+  };
+
+  const isVideo =
+    story.type === 'video' ||
+    story.mediaUrl?.endsWith('.webm') ||
+    story.mediaUrl?.endsWith('.mp4');
+
   return (
-    <div className="ig-story-viewer-modal" onClick={onClose}>
-      <button
-        onClick={onClose}
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        background: 'rgba(4, 6, 14, 0.92)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        animation: 'zqFadeIn 0.2s ease-out forwards',
+      }}
+    >
+      {/* Main Story Card Frame */}
+      <div
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: 'fixed',
-          top: '24px',
-          right: '24px',
-          background: 'none',
-          border: 'none',
-          color: '#fff',
-          fontSize: '28px',
-          cursor: 'pointer',
-          zIndex: 300,
+          position: 'relative',
+          width: '100%',
+          maxWidth: '420px',
+          height: 'min(740px, 90vh)',
+          background: '#090b14',
+          borderRadius: '28px',
+          border: '1px solid rgba(121, 40, 202, 0.4)',
+          boxShadow: '0 24px 72px rgba(0, 0, 0, 0.9), 0 0 40px rgba(121, 40, 202, 0.3)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          animation: 'zqZoomIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         }}
       >
-        ✕
-      </button>
-
-      <div className="ig-story-viewer-frame" onClick={(e) => e.stopPropagation()}>
-        {/* Progress bar */}
-        <div className="ig-story-progress-bar">
-          <div className="ig-story-progress-fill" style={{ width: `${progress}%` }} />
+        {/* Story Progress Bar */}
+        <div style={{ position: 'absolute', top: 12, left: 14, right: 14, zIndex: 30, display: 'flex', gap: 4 }}>
+          <div style={{ flex: 1, height: 3.5, background: 'rgba(255, 255, 255, 0.3)', borderRadius: 4, overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${progress}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #00dfd8, #7928ca)',
+                boxShadow: '0 0 8px #00dfd8',
+                transition: 'width 0.1s linear',
+              }}
+            />
+          </div>
         </div>
 
-        {/* Header */}
-        <div className="ig-story-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img
-              src={story.authorAvatar || '/placeholder-avatar.png'}
-              alt={story.title}
-              style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover', border: '1px solid #fff' }}
-            />
-            <span style={{ fontWeight: 600, fontSize: '14px' }}>{story.authorName || story.title}</span>
+        {/* Top Header */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 24,
+            left: 14,
+            right: 14,
+            zIndex: 30,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%)',
+            padding: '4px 0',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                padding: 2,
+                background: 'linear-gradient(45deg, #00dfd8, #7928ca)',
+                boxShadow: '0 0 12px rgba(0, 223, 216, 0.5)',
+              }}
+            >
+              <img
+                src={story.authorAvatar || '/placeholder-avatar.png'}
+                alt={story.title}
+                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-avatar.png'; }}
+              />
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: '14px', color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+                {story.authorName || story.title}
+              </div>
+              <div style={{ fontSize: '11px', color: '#00dfd8', fontWeight: 600 }}>
+                {story.vibe || '⚡ Active Aura Moment'}
+              </div>
+            </div>
           </div>
+
           <button
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer' }}
+            style={{
+              background: 'rgba(0, 0, 0, 0.45)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#fff',
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '14px',
+            }}
           >
             ✕
           </button>
         </div>
 
-        {/* Media content */}
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#000' }}>
-          {story.type === 'video' || story.mediaUrl.endsWith('.webm') || story.mediaUrl.endsWith('.mp4') ? (
-            <video src={story.mediaUrl} autoPlay loop playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        {/* Story Media Viewer */}
+        <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
+          {isVideo ? (
+            <video
+              src={story.mediaUrl}
+              autoPlay
+              loop
+              playsInline
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
           ) : (
-            <img src={story.mediaUrl} alt={story.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img
+              src={story.mediaUrl}
+              alt={story.title}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           )}
+
+          {/* Spark Particle Animation Effect */}
+          {sparkEffect && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '64px',
+                animation: 'zqZoomIn 0.3s ease-out forwards',
+                pointerEvents: 'none',
+              }}
+            >
+              ⚡
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Reaction & Spark Bar */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: '16px 20px',
+            background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, transparent 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            zIndex: 30,
+          }}
+        >
+          <div style={{ display: 'flex', gap: 6 }}>
+            {['⚡', '🔥', '❤️', '💡', '🚀'].map((em) => (
+              <button
+                key={em}
+                onClick={() => handleSpark(em)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '12px',
+                  padding: '6px 10px',
+                  fontSize: '15px',
+                  cursor: 'pointer',
+                  transition: 'transform 0.15s ease',
+                }}
+                onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.2)')}
+                onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+              >
+                {em}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => handleSpark('⚡')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '16px',
+              border: 'none',
+              background: liked ? 'linear-gradient(135deg, #00dfd8, #7928ca)' : 'rgba(255, 255, 255, 0.12)',
+              color: '#fff',
+              fontWeight: 800,
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              boxShadow: liked ? '0 0 16px #00dfd8' : 'none',
+            }}
+          >
+            <AuraSparkIcon size={16} active={liked} />
+            <span>{liked ? 'Sparks Sent' : 'Send Spark'}</span>
+          </button>
         </div>
       </div>
     </div>

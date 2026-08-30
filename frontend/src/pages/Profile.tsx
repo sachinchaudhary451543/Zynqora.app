@@ -557,7 +557,14 @@ export default function Profile() {
         )}
 
         {activeTab === 'circles' && isOwnProfile && (
-          <div>
+          <div style={{ maxWidth: '520px', margin: '0 auto', background: 'var(--zq-surface-card)', padding: '24px', borderRadius: '24px', border: '1px solid var(--zq-glass-border)', boxShadow: '0 12px 36px rgba(0,0,0,0.3)' }}>
+            <div style={{ marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '20px' }}>⚡</span>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#fff' }}>Publish Aura Moment / Status</h3>
+                <div style={{ fontSize: '12px', color: 'var(--zq-text-secondary)' }}>Broadcast a 24h photo, video clip, or vibe status to your circle</div>
+              </div>
+            </div>
             <StoryRecorder onSaved={load} />
           </div>
         )}

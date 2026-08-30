@@ -192,18 +192,22 @@ export default function Feed() {
 
         {/* Story Recorder Modal */}
         {showStoryRecorder && (
-          <div className="ig-modal-overlay" onClick={() => setShowStoryRecorder(false)}>
-            <div className="ig-modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', background: 'var(--zq-surface-elevated)', border: '1px solid var(--zq-glass-border)' }}>
-              <div className="ig-modal-header" style={{ color: '#fff' }}>
-                <span>Record Aura Moment</span>
-                <button className="ig-modal-close-btn" onClick={() => setShowStoryRecorder(false)}>✕</button>
+          <div className="zq-modal-overlay" onClick={() => setShowStoryRecorder(false)}>
+            <div className="zq-modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+              <div className="zq-modal-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '18px' }}>⚡</span>
+                  <span style={{ color: '#fff', fontWeight: 800 }}>Publish Aura Moment / Status</span>
+                </div>
+                <button className="zq-modal-close-btn" onClick={() => setShowStoryRecorder(false)}>✕</button>
               </div>
-              <div style={{ padding: '16px' }}>
+              <div style={{ padding: '20px', maxHeight: '80vh', overflowY: 'auto' }}>
                 <StoryRecorder
                   onSaved={() => {
                     setShowStoryRecorder(false);
                     loadStories();
                   }}
+                  onClose={() => setShowStoryRecorder(false)}
                 />
               </div>
             </div>
