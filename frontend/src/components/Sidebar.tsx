@@ -39,7 +39,6 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
         setShowMoreMenu(false);
       }
       if (sparksRef.current && !sparksRef.current.contains(event.target as Node)) {
-        // don't close if clicked on the sparks button
         const target = event.target as HTMLElement;
         if (!target.closest('.zq-sparks-btn')) {
           setShowNotifications(false);
@@ -67,6 +66,96 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
 
   return (
     <>
+      {/* 1. TOP MOBILE APP BAR (Visible on screens <= 768px) */}
+      <header className="zq-mobile-top-bar">
+        <NavLink to="/feed" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none' }}>
+          <ZynqoraLogo size={28} />
+          <ZynqoraWordmark />
+        </NavLink>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button
+            type="button"
+            className="zq-sparks-btn"
+            onClick={() => setShowNotifications(!showNotifications)}
+            style={{
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#fff',
+              position: 'relative',
+              cursor: 'pointer',
+            }}
+          >
+            <NotificationsIcon size={18} active={showNotifications} />
+            <span className="zq-badge-dot" style={{ top: '6px', right: '6px' }} />
+          </button>
+        </div>
+      </header>
+
+      {/* 2. BOTTOM MOBILE NAVIGATION BAR (Visible on screens <= 768px) */}
+      <nav className="zq-mobile-bottom-nav">
+        <NavLink
+          to="/feed"
+          className={({ isActive }) => `zq-mobile-nav-btn ${isActive ? 'active' : ''}`}
+        >
+          <HomeIcon size={22} active={location.pathname === '/feed'} />
+          <span>Feed</span>
+        </NavLink>
+
+        <NavLink
+          to="/explore"
+          className={({ isActive }) => `zq-mobile-nav-btn ${isActive ? 'active' : ''}`}
+        >
+          <ExploreIcon size={22} active={location.pathname === '/explore'} />
+          <span>Discover</span>
+        </NavLink>
+
+        {/* Center Create Post Floating Button */}
+        <button
+          type="button"
+          className="zq-mobile-create-btn"
+          onClick={onOpenCreateModal}
+          title="Create Sync Post"
+        >
+          <CreateIcon size={22} />
+        </button>
+
+        <NavLink
+          to="/chat"
+          className={({ isActive }) => `zq-mobile-nav-btn ${isActive ? 'active' : ''}`}
+        >
+          <div style={{ position: 'relative' }}>
+            <MessagesIcon size={22} active={location.pathname.startsWith('/chat')} />
+            {unreadCount > 0 && <span className="zq-badge-count" style={{ top: '-4px', right: '-8px' }}>{unreadCount}</span>}
+          </div>
+          <span>Sync Chat</span>
+        </NavLink>
+
+        {user && (
+          <NavLink
+            to={`/profile/${user.username}`}
+            className={({ isActive }) => `zq-mobile-nav-btn ${isActive ? 'active' : ''}`}
+          >
+            <div className={`zq-avatar-ring ${location.pathname === `/profile/${user.username}` ? 'active-ring' : ''}`} style={{ width: '22px', height: '22px', padding: 1.5 }}>
+              <img
+                src={userAvatar}
+                alt={user.name}
+                className="zq-avatar-img"
+                onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+              />
+            </div>
+            <span>My Aura</span>
+          </NavLink>
+        )}
+      </nav>
+
+      {/* 3. DESKTOP & TABLET SIDEBAR (Screens > 768px) */}
       <aside className="zq-sidebar">
         <div className="zq-sidebar-top">
           {/* ZYNQORA Brand Logo & Wordmark */}
@@ -240,20 +329,20 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
         </div>
       </aside>
 
-      {/* Aura Sparks Notification Flyout */}
+      {/* Aura Sparks Notification Flyout (Responsive for Desktop & Mobile) */}
       {showNotifications && (
         <div
           ref={sparksRef}
           style={{
             position: 'fixed',
-            top: '20px',
-            left: 'calc(var(--sidebar-width) + 12px)',
-            width: '380px',
-            maxHeight: '80vh',
+            top: '60px',
+            right: '12px',
+            width: 'min(380px, 94vw)',
+            maxHeight: '75vh',
             background: 'linear-gradient(180deg, #131728 0%, #0c0e18 100%)',
             border: '1px solid rgba(121, 40, 202, 0.35)',
             borderRadius: '24px',
-            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.8), 0 0 40px rgba(121, 40, 202, 0.25)',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.85), 0 0 40px rgba(121, 40, 202, 0.25)',
             zIndex: 1000,
             display: 'flex',
             flexDirection: 'column',
@@ -261,10 +350,10 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             animation: 'zqZoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
           }}
         >
-          <div style={{ padding: '18px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <AuraSparkIcon size={20} active={true} style={{ color: '#00dfd8' }} />
-              <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: 0 }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#fff', margin: 0 }}>
                 Aura Sparks & Activity
               </h3>
             </div>
@@ -285,7 +374,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
                   navigate(`/profile/${s.user}`);
                 }}
                 style={{
-                  padding: '12px 14px',
+                  padding: '10px 12px',
                   borderRadius: '16px',
                   background: 'rgba(255, 255, 255, 0.03)',
                   border: '1px solid rgba(255, 255, 255, 0.06)',
@@ -293,7 +382,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
                   transition: 'all 0.15s ease',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '12px',
+                  gap: '10px',
                 }}
                 onMouseOver={(e) => {
                   e.currentTarget.style.background = 'rgba(121, 40, 202, 0.15)';
@@ -306,8 +395,8 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
               >
                 <div
                   style={{
-                    width: '38px',
-                    height: '38px',
+                    width: '34px',
+                    height: '34px',
                     borderRadius: '50%',
                     background: 'linear-gradient(45deg, #00dfd8, #7928ca)',
                     display: 'flex',
@@ -316,15 +405,16 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
                     fontWeight: 800,
                     color: '#fff',
                     flexShrink: 0,
+                    fontSize: '13px',
                   }}
                 >
                   {s.user.charAt(0).toUpperCase()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', color: '#fff', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '12.5px', color: '#fff', lineHeight: 1.4 }}>
                     <strong>@{s.user}</strong> {s.action}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#00dfd8', marginTop: '3px' }}>
+                  <div style={{ fontSize: '10.5px', color: '#00dfd8', marginTop: '2px' }}>
                     {s.time}
                   </div>
                 </div>
@@ -332,82 +422,64 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             ))}
           </div>
 
-          <div style={{ padding: '12px', textAlign: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
-            <span style={{ fontSize: '11px', color: '#6b7280', letterSpacing: '0.5px' }}>
+          <div style={{ padding: '10px', textAlign: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+            <span style={{ fontSize: '10.5px', color: '#6b7280', letterSpacing: '0.5px' }}>
               ✦ REAL-TIME QUANTUM SYNC CONNECTED
             </span>
           </div>
         </div>
       )}
 
-      {/* Aura Insights Modal */}
+      {/* Aura Insights Modal (Responsive for Desktop & Mobile) */}
       {showInsights && (
         <div
           onClick={() => setShowInsights(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            background: 'rgba(5, 7, 12, 0.82)',
-            backdropFilter: 'blur(16px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-          }}
+          className="zq-modal-overlay"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{
-              background: 'linear-gradient(180deg, #131728 0%, #0a0c16 100%)',
-              border: '1px solid rgba(0, 223, 216, 0.35)',
-              borderRadius: '24px',
-              width: '100%',
-              maxWidth: '520px',
-              overflow: 'hidden',
-              boxShadow: '0 28px 72px rgba(0, 0, 0, 0.85), 0 0 50px rgba(0, 223, 216, 0.15)',
-              animation: 'zqZoomIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-            }}
+            className="zq-modal-box"
+            style={{ maxWidth: '520px' }}
           >
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="zq-modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <DashboardIcon size={22} active={true} />
-                <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#fff', margin: 0 }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#fff', margin: 0 }}>
                   Aura Resonance Insights
                 </h3>
               </div>
               <button
                 onClick={() => setShowInsights(false)}
-                style={{ background: 'rgba(255,255,255,0.08)', border: 'none', color: '#fff', width: '30px', height: '30px', borderRadius: '50%', cursor: 'pointer' }}
+                className="zq-modal-close-btn"
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
               {/* Top Score */}
               <div
                 style={{
                   background: 'linear-gradient(135deg, rgba(0, 223, 216, 0.15) 0%, rgba(121, 40, 202, 0.15) 100%)',
                   border: '1px solid rgba(0, 223, 216, 0.3)',
-                  borderRadius: '20px',
-                  padding: '20px',
+                  borderRadius: '18px',
+                  padding: '16px',
                   textAlign: 'center',
                 }}
               >
-                <div style={{ fontSize: '12px', color: '#00dfd8', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '11px', color: '#00dfd8', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>
                   AURA RESONANCE SCORE
                 </div>
-                <div style={{ fontSize: '42px', fontWeight: 900, color: '#fff', margin: '6px 0', textShadow: '0 0 20px rgba(0, 223, 216, 0.6)' }}>
-                  98.4 <span style={{ fontSize: '18px', color: '#7928ca' }}>/ 100</span>
+                <div style={{ fontSize: '38px', fontWeight: 900, color: '#fff', margin: '4px 0', textShadow: '0 0 20px rgba(0, 223, 216, 0.6)' }}>
+                  98.4 <span style={{ fontSize: '16px', color: '#7928ca' }}>/ 100</span>
                 </div>
-                <div style={{ fontSize: '13px', color: '#9499ab' }}>
+                <div style={{ fontSize: '12px', color: '#9499ab' }}>
                   Top 2% creator momentum in <strong>Tech Innovators Circle</strong>
                 </div>
               </div>
 
               {/* Stats Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                 {[
                   { label: 'Weekly Reach', val: '4.8k', change: '+24%' },
                   { label: 'Sync Sparks', val: '642', change: '+38%' },
@@ -418,14 +490,14 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
                     style={{
                       background: 'rgba(255, 255, 255, 0.03)',
                       border: '1px solid rgba(255, 255, 255, 0.07)',
-                      borderRadius: '16px',
-                      padding: '14px',
+                      borderRadius: '14px',
+                      padding: '12px 8px',
                       textAlign: 'center',
                     }}
                   >
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: '#fff' }}>{st.val}</div>
-                    <div style={{ fontSize: '11px', color: '#8892b0', marginTop: '2px' }}>{st.label}</div>
-                    <div style={{ fontSize: '11px', color: '#10b981', fontWeight: 700, marginTop: '4px' }}>{st.change}</div>
+                    <div style={{ fontSize: '18px', fontWeight: 800, color: '#fff' }}>{st.val}</div>
+                    <div style={{ fontSize: '10.5px', color: '#8892b0', marginTop: '2px' }}>{st.label}</div>
+                    <div style={{ fontSize: '10.5px', color: '#10b981', fontWeight: 700, marginTop: '2px' }}>{st.change}</div>
                   </div>
                 ))}
               </div>
@@ -437,13 +509,13 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
                   navigate('/explore');
                 }}
                 style={{
-                  padding: '14px',
+                  padding: '13px',
                   borderRadius: '14px',
                   border: 'none',
                   background: 'linear-gradient(135deg, #00dfd8 0%, #7928ca 100%)',
                   color: '#fff',
                   fontWeight: 800,
-                  fontSize: '14px',
+                  fontSize: '13px',
                   cursor: 'pointer',
                   boxShadow: '0 4px 20px rgba(0, 223, 216, 0.35)',
                 }}

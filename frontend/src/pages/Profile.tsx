@@ -213,64 +213,82 @@ export default function Profile() {
   const profileVibe = profile.note || '🌟 Zynqora Pioneer';
 
   return (
-    <div className="page" style={{ maxWidth: 800, margin: '0 auto' }}>
+    <div className="page zq-profile-page-wrap" style={{ maxWidth: 840, margin: '0 auto', padding: '0 16px' }}>
       
       {/* Header / Vibe Banner */}
-      <div style={{
-        position: 'relative',
-        height: 200,
-        borderRadius: 24,
-        background: `linear-gradient(135deg, ${auraColor}44, #1a1a2e)`,
-        marginBottom: 80,
-        border: `1px solid ${auraColor}33`,
-        boxShadow: `0 8px 32px ${auraColor}11`,
-        overflow: 'visible'
-      }}>
-        <div style={{ position: 'absolute', bottom: -60, left: 40, display: 'flex', alignItems: 'flex-end', gap: 24 }}>
+      <div
+        className="zq-profile-banner"
+        style={{
+          position: 'relative',
+          height: 180,
+          borderRadius: 24,
+          background: `linear-gradient(135deg, ${auraColor}44, #1a1a2e)`,
+          marginBottom: 74,
+          border: `1px solid ${auraColor}33`,
+          boxShadow: `0 8px 32px ${auraColor}11`,
+        }}
+      >
+        <div
+          className="zq-profile-avatar-wrap"
+          style={{
+            position: 'absolute',
+            bottom: -50,
+            left: 24,
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: 18,
+          }}
+        >
           {/* Avatar with Aura Ring */}
           <div 
             style={{ 
               position: 'relative',
               cursor: isOwnProfile ? 'pointer' : 'default',
-              padding: 6,
+              padding: 5,
               borderRadius: '50%',
               background: `linear-gradient(45deg, ${auraColor}, #00f2fe)`,
               boxShadow: `0 0 20px ${auraColor}66`,
+              flexShrink: 0,
             }}
             onClick={() => isOwnProfile && setShowAvatarModal(true)}
           >
             <img 
               src={avatarUrlToDisplay} 
               alt="avatar" 
-              style={{ width: 120, height: 120, borderRadius: '50%', objectFit: 'cover', border: '4px solid #0f0f13' }} 
+              className="zq-profile-avatar-img"
+              style={{ width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', border: '4px solid #0f0f13', display: 'block' }} 
               onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-avatar.png'; }}
             />
             {isOwnProfile && (
-              <div style={{ position: 'absolute', bottom: 10, right: 10, background: '#1a1a2e', padding: 6, borderRadius: '50%', border: '2px solid #0f0f13' }}>
-                <ImageIcon size={16} />
+              <div style={{ position: 'absolute', bottom: 6, right: 6, background: '#1a1a2e', padding: 5, borderRadius: '50%', border: '2px solid #0f0f13' }}>
+                <ImageIcon size={14} />
               </div>
             )}
           </div>
           
-          <div style={{ paddingBottom: 16 }}>
-            <h1 style={{ margin: 0, fontSize: 28, display: 'flex', alignItems: 'center', gap: 8, color: '#fff' }}>
-              {profile.name} <CheckCircleIcon size={22} active={true} style={{ color: auraColor }} />
+          <div style={{ paddingBottom: 10 }}>
+            <h1 style={{ margin: 0, fontSize: 24, display: 'flex', alignItems: 'center', gap: 6, color: '#fff' }}>
+              {profile.name} <CheckCircleIcon size={20} active={true} style={{ color: auraColor }} />
             </h1>
-            <div style={{ color: '#8892b0', fontSize: 15, marginTop: 4 }}>@{profile.username}</div>
+            <div style={{ color: '#8892b0', fontSize: 13, marginTop: 2 }}>@{profile.username}</div>
           </div>
         </div>
         
         {/* Actions */}
-        <div style={{ position: 'absolute', bottom: 24, right: 24, display: 'flex', gap: 12 }}>
+        <div
+          className="zq-profile-actions-bar"
+          style={{ position: 'absolute', bottom: 16, right: 20, display: 'flex', gap: 10 }}
+        >
           {!isOwnProfile ? (
             <>
               <button 
                 onClick={handleFollow} 
+                className="zq-profile-btn"
                 style={{ 
                   background: profile.isFollowing ? 'transparent' : `linear-gradient(135deg, ${auraColor}, #7c3aed)`,
                   border: profile.isFollowing ? `1px solid ${auraColor}` : 'none',
-                  color: '#fff', padding: '9px 26px', borderRadius: 16, fontWeight: 700, cursor: 'pointer',
-                  fontSize: 14, letterSpacing: 0.4,
+                  color: '#fff', padding: '8px 20px', borderRadius: 14, fontWeight: 700, cursor: 'pointer',
+                  fontSize: 13, letterSpacing: 0.4,
                   boxShadow: profile.isFollowing ? 'none' : `0 4px 20px ${auraColor}55`,
                   transition: 'all 0.2s'
                 }}
@@ -279,44 +297,42 @@ export default function Profile() {
               </button>
               <button
                 onClick={() => navigate(`/chat/${profile.username}`)}
+                className="zq-profile-btn"
                 style={{ 
                   background: 'rgba(255,255,255,0.07)',
                   color: '#e8e8f0',
                   border: '1px solid rgba(255,255,255,0.15)', 
-                  padding: '9px 22px', borderRadius: 16, fontWeight: 700, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 8, fontSize: 14,
+                  padding: '8px 18px', borderRadius: 14, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6, fontSize: 13,
                   letterSpacing: 0.4, transition: 'all 0.2s',
                 }}
-                onMouseOver={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.13)'; }}
-                onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)'; }}
               >
-                <MessagesIcon size={16} /> Message
+                <MessagesIcon size={14} /> Message
               </button>
             </>
           ) : (
             <button
               onClick={() => navigate('/settings')}
-              style={{ background: 'rgba(255,255,255,0.07)', color: '#e8e8f0', border: '1px solid rgba(255,255,255,0.15)', padding: '9px 22px', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 700, fontSize: 14, transition: 'all 0.2s' }}
-              onMouseOver={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.13)'; }}
-              onMouseOut={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)'; }}
+              className="zq-profile-btn"
+              style={{ background: 'rgba(255,255,255,0.07)', color: '#e8e8f0', border: '1px solid rgba(255,255,255,0.15)', padding: '8px 18px', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 700, fontSize: 13, transition: 'all 0.2s' }}
             >
-              <SettingsGearIcon size={18} /> Control Center
+              <SettingsGearIcon size={16} /> Control Center
             </button>
           )}
         </div>
       </div>
 
-      <div style={{ padding: '0 40px' }}>
-        <p style={{ fontSize: 15, lineHeight: 1.6, color: '#ccd6f6', marginBottom: 16, maxWidth: 600 }}>
+      <div style={{ padding: '0 8px' }}>
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: '#ccd6f6', marginBottom: 14, maxWidth: 600 }}>
           {profile.bio || "This user is syncing to the Zynqora vibe."}
         </p>
 
         {/* Dynamic Vibe Status */}
         <div style={{ 
           display: 'inline-flex', alignItems: 'center', gap: 8, 
-          padding: '6px 14px', background: `${auraColor}11`, 
-          border: `1px solid ${auraColor}33`, borderRadius: 16, 
-          color: auraColor, fontSize: 13, fontWeight: 600, marginBottom: 28
+          padding: '5px 12px', background: `${auraColor}11`, 
+          border: `1px solid ${auraColor}33`, borderRadius: 14, 
+          color: auraColor, fontSize: 12, fontWeight: 600, marginBottom: 24
         }}>
           ✨ {profileVibe}
         </div>

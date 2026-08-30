@@ -114,8 +114,8 @@ export default function Explore() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-            gap: '16px',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+            gap: '12px',
           }}
         >
           {filtered.map((u) => {
@@ -127,8 +127,8 @@ export default function Explore() {
                 key={u.id}
                 style={{
                   border: '1px solid var(--zq-glass-border)',
-                  borderRadius: '20px',
-                  padding: '24px 18px',
+                  borderRadius: '18px',
+                  padding: '18px 12px',
                   textAlign: 'center',
                   background: 'var(--zq-surface-card)',
                   display: 'flex',
@@ -140,7 +140,7 @@ export default function Explore() {
                 onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--zq-glass-border-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--zq-glass-border)')}
               >
-                <div className="zq-avatar-ring" style={{ width: '64px', height: '64px', marginBottom: '14px', cursor: 'pointer' }} onClick={() => navigate(`/profile/${u.username}`)}>
+                <div className="zq-avatar-ring" style={{ width: '56px', height: '56px', marginBottom: '10px', cursor: 'pointer' }} onClick={() => navigate(`/profile/${u.username}`)}>
                   <img
                     src={avatar}
                     alt={u.name}
@@ -152,17 +152,17 @@ export default function Explore() {
                 </div>
 
                 <div
-                  style={{ fontWeight: 800, fontSize: '15px', color: '#fff', cursor: 'pointer', marginBottom: '2px' }}
+                  style={{ fontWeight: 800, fontSize: '14px', color: '#fff', cursor: 'pointer', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}
                   onClick={() => navigate(`/profile/${u.username}`)}
                 >
                   {u.name}
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--zq-accent-cyan)', marginBottom: '8px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--zq-accent-cyan)', marginBottom: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
                   @{u.username}
                 </div>
 
                 {u.bio && (
-                  <p style={{ fontSize: '12px', color: 'var(--zq-text-secondary)', marginBottom: '16px', maxHeight: '36px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <p style={{ fontSize: '11px', color: 'var(--zq-text-secondary)', marginBottom: '12px', maxHeight: '32px', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
                     {u.bio}
                   </p>
                 )}
@@ -170,7 +170,7 @@ export default function Explore() {
                 <div style={{ marginTop: 'auto', width: '100%' }}>
                   <button
                     className={isFollowing ? 'zq-btn-glass' : 'zq-btn-aura'}
-                    style={{ width: '100%', fontSize: '12px', padding: '8px 0' }}
+                    style={{ width: '100%', fontSize: '11.5px', padding: '7px 0', borderRadius: '12px' }}
                     onClick={() => handleFollowToggle(u.username)}
                   >
                     {isFollowing ? 'In Sync ✓' : '⚡ Sync'}
