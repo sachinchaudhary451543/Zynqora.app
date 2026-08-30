@@ -9,6 +9,7 @@ import ImageEditor from '../components/ImageEditor';
 import AvatarActionsModal from '../components/AvatarActionsModal';
 import FollowersModal from '../components/FollowersModal';
 import AiStudioModal from '../components/AiStudioModal';
+import LiveCallModal from '../components/LiveCallModal';
 import { SettingsGearIcon, TaggedIcon as ImageIcon, ReelsIcon as VideoIcon, AuraSparkIcon as CheckCircleIcon, MessagesIcon } from '../components/Icons';
 
 export default function Profile() {
@@ -18,6 +19,7 @@ export default function Profile() {
   const [profile, setProfile] = useState<any>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [error, setError] = useState('');
+  const [activeCall, setActiveCall] = useState<{ peer: any; type: 'video' | 'audio' } | null>(null);
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -302,12 +304,54 @@ export default function Profile() {
                   background: 'rgba(255,255,255,0.07)',
                   color: '#e8e8f0',
                   border: '1px solid rgba(255,255,255,0.15)', 
-                  padding: '8px 18px', borderRadius: 14, fontWeight: 700, cursor: 'pointer',
+                  padding: '8px 16px', borderRadius: 14, fontWeight: 700, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: 6, fontSize: 13,
                   letterSpacing: 0.4, transition: 'all 0.2s',
                 }}
               >
                 <MessagesIcon size={14} /> Message
+              </button>
+              {/* Call Buttons for In-Circle connections */}
+              <button
+                onClick={() => setActiveCall({ peer: profile, type: 'audio' })}
+                title="Start Audio Call"
+                className="zq-profile-btn"
+                style={{
+                  background: 'rgba(0, 223, 216, 0.12)',
+                  border: '1px solid rgba(0, 223, 216, 0.3)',
+                  color: '#00dfd8',
+                  padding: '8px 12px',
+                  borderRadius: 14,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <span>📞</span>
+              </button>
+              <button
+                onClick={() => setActiveCall({ peer: profile, type: 'video' })}
+                title="Start Video Call"
+                className="zq-profile-btn"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(121, 40, 202, 0.3), rgba(255, 0, 128, 0.3))',
+                  border: '1px solid rgba(121, 40, 202, 0.45)',
+                  color: '#ff0080',
+                  padding: '8px 12px',
+                  borderRadius: 14,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  boxShadow: '0 2px 10px rgba(121, 40, 202, 0.25)',
+                }}
+              >
+                <span>📹</span>
               </button>
             </>
           ) : (
@@ -640,6 +684,15 @@ export default function Profile() {
           users={loadingFollowing ? [] : following}
           onClose={() => setShowFollowingModal(false)}
           onFollowToggled={load}
+        />
+      )}
+
+      {/* Live Video & Audio Call Modal */}
+      {activeCall && (
+        <LiveCallModal
+          peer={activeCall.peer}
+          callType={activeCall.type}
+          onEndCall={() => setActiveCall(null)}
         />
       )}
     </div>

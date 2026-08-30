@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api, User, getAvatarUrl } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { MessagesIcon, SearchIcon } from '../components/Icons';
+import LiveCallModal from '../components/LiveCallModal';
 
 export default function ChatPage() {
   const { username } = useParams<{ username?: string }>();
@@ -18,6 +19,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth <= 768);
+  const [activeCall, setActiveCall] = useState<{ peer: any; type: 'video' | 'audio' } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -324,23 +326,75 @@ export default function ChatPage() {
                   </div>
                 </div>
 
-                {/* View Profile Action */}
-                <Link to={`/profile/${activeUsername}`}>
+                {/* Call & Profile Action Buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* Audio Call Button */}
                   <button
+                    type="button"
+                    onClick={() => setActiveCall({ peer: activeUser || { username: activeUsername }, type: 'audio' })}
+                    title="Start Audio Call"
                     style={{
-                      padding: '6px 12px',
-                      borderRadius: '10px',
-                      background: 'rgba(255, 255, 255, 0.06)',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
-                      color: '#ccd6f6',
-                      fontSize: '11px',
-                      fontWeight: 700,
+                      padding: '7px 11px',
+                      borderRadius: '12px',
+                      background: 'rgba(0, 223, 216, 0.12)',
+                      border: '1px solid rgba(0, 223, 216, 0.3)',
+                      color: '#00dfd8',
+                      fontSize: '13px',
                       cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      fontWeight: 700,
+                      transition: 'all 0.2s ease',
                     }}
                   >
-                    Profile ↗
+                    <span>📞</span>
+                    <span style={{ fontSize: '11px' }}>Call</span>
                   </button>
-                </Link>
+
+                  {/* Video Call Button */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveCall({ peer: activeUser || { username: activeUsername }, type: 'video' })}
+                    title="Start Video Call"
+                    style={{
+                      padding: '7px 11px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, rgba(121, 40, 202, 0.25), rgba(255, 0, 128, 0.25))',
+                      border: '1px solid rgba(121, 40, 202, 0.45)',
+                      color: '#ff0080',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      fontWeight: 700,
+                      boxShadow: '0 2px 10px rgba(121, 40, 202, 0.25)',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <span>📹</span>
+                    <span style={{ fontSize: '11px' }}>Video</span>
+                  </button>
+
+                  {/* View Profile Action */}
+                  <Link to={`/profile/${activeUsername}`}>
+                    <button
+                      style={{
+                        padding: '7px 12px',
+                        borderRadius: '12px',
+                        background: 'rgba(255, 255, 255, 0.06)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        color: '#ccd6f6',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Profile ↗
+                    </button>
+                  </Link>
+                </div>
               </div>
 
               {/* Messages Scroll Area */}
@@ -545,6 +599,15 @@ export default function ChatPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Live Video & Audio Call Modal */}
+      {activeCall && (
+        <LiveCallModal
+          peer={activeCall.peer}
+          callType={activeCall.type}
+          onEndCall={() => setActiveCall(null)}
+        />
       )}
     </div>
   );
