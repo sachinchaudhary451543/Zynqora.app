@@ -53,6 +53,14 @@ adds the SPA fallback required by React Router. In Netlify site settings add
 `VITE_API_BASE=https://YOUR-BACKEND-HOST/api`, then redeploy. The backend must
 be deployed separately on an HTTPS host; Netlify does not run this NestJS API.
 
+### Render backend from the same GitHub repository
+
+The repository includes `render.yaml`. In Render choose **New → Blueprint**,
+select `sachinchaudhary451543/Zynqora.app`, and apply the blueprint. Enter
+`DATABASE_URL` (Supabase PostgreSQL), `CORS_ORIGIN` (the Netlify URL), and
+`SERVER_BASE_URL` (the Render service URL) when prompted. Render then builds
+and starts the backend automatically and checks `/api/health`.
+
 Build the frontend with `VITE_API_BASE=https://api.example.com/api npm run build`
 and serve `frontend/dist` from a static host with SPA fallback to `index.html`.
 Build the API with `npm run build` and run `npm start` with a strong
