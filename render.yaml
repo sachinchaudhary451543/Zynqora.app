@@ -5,7 +5,7 @@ services:
     rootDir: backend
     plan: free
     buildCommand: npm install --include=dev && npx prisma generate && npm run prisma:push && npm run build
-    startCommand: npm start
+    startCommand: node ./dist/main.js
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
