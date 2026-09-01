@@ -4,18 +4,27 @@ import { api, User } from '../api/client';
 interface AuthContextValue {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  signup: (data: { email: string; username: string; password: string; name: string }) => Promise<void>;
+  signup: (data: { email: string; username: string; password: string; name: string }) => Promise<string | undefined>;
   logout: () => void;
   setUserState: (user: User | null) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function readStoredUser() {
+  const stored = localStorage.getItem('user');
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as User;
+  } catch {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('user');
-    return stored ? JSON.parse(stored) : null;
-  });
+  const [user, setUser] = useState<User | null>(readStoredUser);
 
   const persist = (token: string, user: User) => {
     localStorage.setItem('token', token);
@@ -37,7 +46,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signup = useCallback(
     async (data: { email: string; username: string; password: string; name: string }) => {
       const res = await api.signup(data);
+      if (res.recoveryCode) {
+        localStorage.setItem('pendingRecoveryCode', res.recoveryCode);
+        window.dispatchEvent(new Event('recovery-code-created'));
+      }
       persist(res.token, res.user);
+      return res.recoveryCode;
     },
     [],
   );

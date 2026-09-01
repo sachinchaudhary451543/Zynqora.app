@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Post, Comment, api } from '../api/client';
+import { Post, Comment, api, getAvatarUrl, resolveMediaUrl } from '../api/client';
 import { NotificationsIcon, CommentIcon, ShareIcon, BookmarkIcon } from './Icons';
 
 interface PostDetailModalProps {
@@ -54,7 +54,18 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
     }
   };
 
-  const authorAvatar = post.author.profileImage || post.author.avatarUrl || '/placeholder-avatar.png';
+  const getYouTubeEmbedUrl = (url?: string | null) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      return `https://www.youtube.com/embed/${match[2]}`;
+    }
+    return null;
+  };
+
+  const ytEmbedUrl = getYouTubeEmbedUrl(post.mediaUrl);
+  const authorAvatar = getAvatarUrl(post.author);
 
   return (
     <div className="ig-modal-overlay" onClick={onClose}>
@@ -78,10 +89,24 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
       <div className="ig-post-lightbox" onClick={(e) => e.stopPropagation()}>
         {/* Media Column */}
         <div className="ig-lightbox-media-col">
-          {post.mediaType === 'video' || (post.mediaUrl && post.mediaUrl.endsWith('.mp4')) ? (
-            <video src={post.mediaUrl || ''} controls autoPlay style={{ width: '100%', height: '100%' }} />
+          {ytEmbedUrl ? (
+            <iframe
+              src={ytEmbedUrl}
+              title="YouTube video player"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                background: '#000',
+              }}
+            />
+          ) : post.mediaType === 'video' || (post.mediaUrl && post.mediaUrl.endsWith('.mp4')) ? (
+            <video src={resolveMediaUrl(post.mediaUrl) || ''} controls autoPlay style={{ width: '100%', height: '100%' }} />
           ) : (
-            <img src={post.mediaUrl || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&fit=crop'} alt="Post media" />
+            <img src={resolveMediaUrl(post.mediaUrl) || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&fit=crop'} alt="Post media" />
           )}
         </div>
 
@@ -113,7 +138,7 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
             {comments.map((c) => (
               <div key={c.id} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                 <img
-                  src={c.author.profileImage || c.author.avatarUrl || '/placeholder-avatar.png'}
+                  src={getAvatarUrl(c.author)}
                   alt={c.author.name}
                   style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
                 />

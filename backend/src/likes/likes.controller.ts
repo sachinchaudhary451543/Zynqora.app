@@ -19,7 +19,7 @@ export class LikesController {
   }
 
   @Get(':postId/likes')
-  getLikes(@Param('postId') postId: string) {
-    return this.likesService.getLikes(postId);
+  getLikes(@CurrentUser() user: { userId: string }, @Param('postId') postId: string) {
+    return this.likesService.getLikes(user.userId, postId);
   }
 }

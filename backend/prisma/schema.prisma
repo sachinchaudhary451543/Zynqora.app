@@ -16,11 +16,15 @@ model User {
   bio          String?
   avatarUrl    String?
   profileImage String?  // New: Profile picture URL
+  bannerImage  String?
   website      String?
   category     String?
   note         String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now()) @updatedAt
+  resetToken   String?
+  resetTokenExpiresAt DateTime?
+  recoveryCodeHash String?
 
   // Privacy settings
   profileVisibility     String @default("PUBLIC")      // PUBLIC, FOLLOWERS_ONLY, PRIVATE

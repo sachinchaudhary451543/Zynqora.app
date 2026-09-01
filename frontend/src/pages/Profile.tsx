@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, Post, getAvatarUrl } from '../api/client';
+import { api, Post, getAvatarUrl, getDefaultAvatar, normalizeConnectionUsers } from '../api/client';
 import PostCard from '../components/PostCard';
 import { useAuth } from '../context/AuthContext';
 
@@ -12,6 +12,7 @@ import AiStudioModal from '../components/AiStudioModal';
 import LiveCallModal from '../components/LiveCallModal';
 import { SettingsGearIcon, TaggedIcon as ImageIcon, ReelsIcon as VideoIcon, AuraSparkIcon as CheckCircleIcon, MessagesIcon } from '../components/Icons';
 
+
 export default function Profile() {
   const navigate = useNavigate();
   const { username } = useParams<{ username: string }>();
@@ -22,6 +23,7 @@ export default function Profile() {
   const [activeCall, setActiveCall] = useState<{ peer: any; type: 'video' | 'audio' } | null>(null);
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const bannerInputRef = React.useRef<HTMLInputElement | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [remotePreviewUrl, setRemotePreviewUrl] = useState<string | null>(null);
@@ -41,15 +43,28 @@ export default function Profile() {
 
   const load = async () => {
     if (!username) return;
+    setError('');
     try {
-      const [profileRes, postsRes] = await Promise.all([
-        api.getProfile(username),
-        api.getUserPosts(username),
-      ]);
+      const profileRes = await api.getProfile(username);
       setProfile(profileRes);
-      setPosts(postsRes);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Failed to load profile');
+      return;
+    }
+
+    try {
+      const postsRes = await api.getUserPosts(username);
+      // Keep the page resilient if an older backend returns a paginated
+      // envelope instead of the plain array used by this view.
+      const normalizedPosts = Array.isArray(postsRes)
+        ? postsRes
+        : Array.isArray((postsRes as any)?.posts)
+          ? (postsRes as any).posts
+          : [];
+      setPosts(normalizedPosts);
+    } catch (err: any) {
+      console.error('Failed to load profile posts', err);
+      setPosts([]);
     }
   };
 
@@ -63,7 +78,7 @@ export default function Profile() {
       setLoadingFollowers(true);
       try {
         const data = await api.getFollowers(username!);
-        setFollowers(data);
+        setFollowers(normalizeConnectionUsers(data, 'follower'));
       } catch (e) { console.error(e); }
       finally { setLoadingFollowers(false); }
     }
@@ -75,16 +90,48 @@ export default function Profile() {
       setLoadingFollowing(true);
       try {
         const data = await api.getFollowing(username!);
-        setFollowing(data);
+        setFollowing(normalizeConnectionUsers(data, 'following'));
       } catch (e) { console.error(e); }
       finally { setLoadingFollowing(false); }
     }
   };
 
+  const [followToast, setFollowToast] = useState<string | null>(null);
+
   const handleFollow = async () => {
-    if (!username) return;
-    await api.follow(username);
-    load();
+    if (!username || !profile) return;
+
+    // Instant Optimistic Feedback
+    const nextIsFollowing = !profile.isFollowing;
+    const currentFollowers = profile._count?.followedBy ?? 0;
+    const nextFollowers = nextIsFollowing ? currentFollowers + 1 : Math.max(0, currentFollowers - 1);
+
+    setProfile((prev: any) => prev ? {
+      ...prev,
+      isFollowing: nextIsFollowing,
+      _count: {
+        ...prev._count,
+        followedBy: nextFollowers,
+      }
+    } : null);
+
+    setFollowToast(nextIsFollowing ? `⚡ Synchronized with @${profile.username} into your circle!` : `Disconnected from @${profile.username}'s circle`);
+    setTimeout(() => setFollowToast(null), 3000);
+
+    try {
+      await api.follow(username);
+    } catch (err) {
+      // Revert if error
+      setProfile((prev: any) => prev ? {
+        ...prev,
+        isFollowing: !nextIsFollowing,
+        _count: {
+          ...prev._count,
+          followedBy: currentFollowers,
+        }
+      } : null);
+      setFollowToast('Sync failed. Please try again.');
+    }
   };
 
   const uploadFileIfAny = async () => {
@@ -148,6 +195,20 @@ export default function Profile() {
 
   const uploadSelectedProfileImage = async () => await uploadFileIfAny();
 
+  const uploadBanner = async (file: File) => {
+    setUploading(true);
+    try {
+      const result = await api.uploadLocal(file);
+      const updated = await api.updateProfile({ bannerImage: result.publicUrl });
+      setProfile((current: any) => ({ ...current, bannerImage: updated.bannerImage }));
+      setUserState?.(updated as any);
+    } catch (err: any) {
+      setError(err.message || 'Failed to update banner image');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const cancelSelectedImage = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setSelectedFile(null);
@@ -207,16 +268,78 @@ export default function Profile() {
     }
   };
 
-  if (error) return <div className="page" style={{color: 'red', textAlign: 'center', marginTop: '2rem'}}>{error}</div>;
-  if (!profile) return <div className="page" style={{textAlign: 'center', marginTop: '2rem', color: '#8892b0'}}>Initializing Zynqora Vibe...</div>;
+  if (error) {
+    return (
+      <div className="page zq-profile-page-wrap" style={{ maxWidth: 840, margin: '40px auto', padding: '0 20px', textAlign: 'center' }}>
+        <div style={{ background: 'rgba(255, 75, 75, 0.08)', border: '1px solid rgba(255, 75, 75, 0.25)', borderRadius: '20px', padding: '36px 24px', color: '#ff6b6b', backdropFilter: 'blur(12px)' }}>
+          <div style={{ fontSize: '36px', marginBottom: '12px' }}>⚠️</div>
+          <h3 style={{ fontSize: '18px', fontWeight: 800, marginBottom: '8px', color: '#fff' }}>Profile Synchronization Notice</h3>
+          <p style={{ fontSize: '14px', color: '#8892b0', marginBottom: '24px', maxWidth: '450px', margin: '0 auto 24px auto' }}>{error}</p>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button
+              onClick={() => { setError(''); load(); }}
+              className="zq-auth-btn"
+              style={{ display: 'inline-block', width: 'auto', padding: '10px 24px', borderRadius: '14px', cursor: 'pointer' }}
+            >
+              ↻ Retry Synchronization
+            </button>
+            <button
+              onClick={() => navigate('/feed')}
+              className="zq-btn-glass"
+              style={{ padding: '10px 20px', borderRadius: '14px', cursor: 'pointer' }}
+            >
+              Back to Feed
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="page zq-profile-page-wrap" style={{ maxWidth: 840, margin: '60px auto', textAlign: 'center', color: '#8892b0' }}>
+        <span className="zq-pulse-orb" style={{ display: 'inline-block', marginBottom: '16px' }} />
+        <div>Synchronizing Aura Presence...</div>
+      </div>
+    );
+  }
+
 
   const isOwnProfile = user?.username === username;
   const avatarUrlToDisplay = previewUrl || getAvatarUrl(profile);
   const profileVibe = profile.note || '🌟 Zynqora Pioneer';
 
   return (
-    <div className="page zq-profile-page-wrap" style={{ maxWidth: 840, margin: '0 auto', padding: '0 16px' }}>
+    <div className="page zq-profile-page-wrap" style={{ maxWidth: 840, margin: '0 auto', padding: '0 16px', position: 'relative' }}>
       
+      {/* Floating Follow Toast Feedback */}
+      {followToast && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '72px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'linear-gradient(135deg, rgba(0, 223, 216, 0.95), rgba(121, 40, 202, 0.95))',
+            color: '#fff',
+            padding: '10px 22px',
+            borderRadius: '24px',
+            boxShadow: '0 8px 32px rgba(0, 223, 216, 0.5)',
+            fontWeight: 800,
+            fontSize: '13px',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            animation: 'zqZoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+          }}
+        >
+          <span>✨</span>
+          <span>{followToast}</span>
+        </div>
+      )}
+
       {/* Header / Vibe Banner */}
       <div
         className="zq-profile-banner"
@@ -224,12 +347,22 @@ export default function Profile() {
           position: 'relative',
           height: 180,
           borderRadius: 24,
-          background: `linear-gradient(135deg, ${auraColor}44, #1a1a2e)`,
+          background: profile.bannerImage
+            ? `linear-gradient(180deg, rgba(8,10,20,.15), rgba(8,10,20,.72)), url(${profile.bannerImage}) center/cover`
+            : `linear-gradient(135deg, ${auraColor}44, #1a1a2e)`,
           marginBottom: 74,
           border: `1px solid ${auraColor}33`,
           boxShadow: `0 8px 32px ${auraColor}11`,
         }}
       >
+        {isOwnProfile && (
+          <>
+            <button type="button" onClick={() => bannerInputRef.current?.click()} disabled={uploading} style={{ position: 'absolute', top: 14, right: 16, zIndex: 3, padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.25)', background: 'rgba(0,0,0,.45)', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>
+              {uploading ? 'Uploading…' : '✎ Change banner'}
+            </button>
+            <input ref={bannerInputRef} type="file" accept="image/*" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadBanner(file); event.target.value = ''; }} />
+          </>
+        )}
         <div
           className="zq-profile-avatar-wrap"
           style={{
@@ -259,7 +392,11 @@ export default function Profile() {
               alt="avatar" 
               className="zq-profile-avatar-img"
               style={{ width: 100, height: 100, borderRadius: '50%', objectFit: 'cover', border: '4px solid #0f0f13', display: 'block' }} 
-              onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-avatar.png'; }}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.onerror = null;
+                target.src = getDefaultAvatar(profile?.name || profile?.username);
+              }}
             />
             {isOwnProfile && (
               <div style={{ position: 'absolute', bottom: 6, right: 6, background: '#1a1a2e', padding: 5, borderRadius: '50%', border: '2px solid #0f0f13' }}>

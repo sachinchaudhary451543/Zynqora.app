@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, User } from '../api/client';
+import { api, User, getAvatarUrl, getDefaultAvatar } from '../api/client';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -43,7 +43,7 @@ export default function Suggestions() {
     }
   };
 
-  const currentUserAvatar = user?.profileImage || user?.avatarUrl || '/placeholder-avatar.png';
+  const currentUserAvatar = getAvatarUrl(user);
 
   return (
     <aside className="zq-feed-sidebar">
@@ -59,7 +59,9 @@ export default function Suggestions() {
                     alt={user.name}
                     className="zq-avatar-img"
                     onError={(e) => {
-                      (e.target as HTMLElement).style.display = 'none';
+                      const target = e.target as HTMLImageElement;
+                      target.onerror = null;
+                      target.src = getDefaultAvatar(user?.name || user?.username);
                     }}
                   />
                 </div>
@@ -102,7 +104,7 @@ export default function Suggestions() {
           ) : (
             suggestions.map((s) => {
               const isFollowing = following.has(s.username);
-              const avatar = s.profileImage || s.avatarUrl || '/placeholder-avatar.png';
+              const avatar = getAvatarUrl(s);
 
               return (
                 <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

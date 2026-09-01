@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { api } from '../api/client';
+import { api, getAvatarUrl } from '../api/client';
 import { AuraSparkIcon } from './Icons';
 
 interface AiStudioModalProps {
@@ -24,7 +24,7 @@ export default function AiStudioModal({
   const [genError, setGenError] = useState('');
 
   // Remaster / Modify Tab State
-  const [sourceImageUrl, setSourceImageUrl] = useState<string>(currentAvatarUrl || '/placeholder-avatar.png');
+  const [sourceImageUrl, setSourceImageUrl] = useState<string>(currentAvatarUrl || getAvatarUrl(null));
   const [modifyPrompt, setModifyPrompt] = useState('');
   const [modifyGender, setModifyGender] = useState<'male' | 'female' | 'neutral' | 'cyborg'>('male');
   const [modifyStyle, setModifyStyle] = useState('cyberpunk');

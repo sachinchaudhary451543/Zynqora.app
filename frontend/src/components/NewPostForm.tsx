@@ -11,7 +11,7 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() && !mediaUrl.trim()) return;
+    if (!content.trim() && !mediaUrl.trim() && !mediaFile) return;
     setLoading(true);
     setError('');
     try {
@@ -29,6 +29,7 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
 
       await api.createPost({ content: content || undefined, mediaUrl: finalMediaUrl || undefined, mediaType: mediaType || undefined });
       setContent('');
+      if (mediaUrl.startsWith('blob:')) URL.revokeObjectURL(mediaUrl);
       setMediaUrl('');
       setMediaType('');
       setMediaFile(null);
@@ -69,6 +70,7 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
               const file = e.target.files?.[0];
               if (!file) return;
               setMediaFile(file);
+              if (mediaUrl.startsWith('blob:')) URL.revokeObjectURL(mediaUrl);
               setMediaUrl(URL.createObjectURL(file));
               setMediaType(file.type.startsWith('image') ? 'image' : 'video');
             }} />
@@ -93,7 +95,7 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
       )}
 
       {error && <p className="error-text">{error}</p>}
-      <button type="submit" disabled={loading || (!content.trim() && !mediaUrl.trim())}>
+      <button type="submit" disabled={loading || (!content.trim() && !mediaUrl.trim() && !mediaFile)}>
         {loading ? '⏳ Posting...' : '📤 Post'}
       </button>
     </form>

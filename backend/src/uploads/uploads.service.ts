@@ -1,7 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { dirname, join } from 'path';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
-import { writeFileSync, mkdirSync, createWriteStream } from 'fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
+import {
+  assertAllowedUploadMime,
+  assertSafeRemoteUrl,
+  MAX_UPLOAD_BYTES,
+  safeUploadPath,
+  sanitizeUploadName,
+} from './upload-safety';
 
 const logger = new Logger('UploadsService');
 
@@ -21,8 +28,13 @@ export class UploadsService {
     return !!process.env.AWS_S3_BUCKET;
   }
 
+  getUploadsDir() {
+    return this.uploadsDir;
+  }
+
   async presign(filename: string, contentType: string) {
-    const key = `${Date.now()}-${randomUUID()}-${filename.replace(/[^a-zA-Z0-9.\-]/g, '_')}`;
+    assertAllowedUploadMime(contentType);
+    const key = `${Date.now()}-${randomUUID()}-${sanitizeUploadName(filename)}`;
 
     if (this.usingS3()) {
       try {
@@ -49,23 +61,32 @@ export class UploadsService {
   }
 
   localPathForKey(key: string) {
-    return join(this.uploadsDir, key);
+    return safeUploadPath(this.uploadsDir, key);
+  }
+
+  resolveLocalPublicPath(key: string) {
+    return this.localPathForKey(key);
   }
 
   async processMedia(options: { inputUrl?: string; inputKey?: string; outputKey: string; trimStart?: number; trimEnd?: number; type?: 'video' | 'image' }) {
-    // download input if needed
+    if (!options.inputUrl && !options.inputKey) {
+      throw new BadRequestException('Media input is required');
+    }
+    if (!options.outputKey) {
+      throw new BadRequestException('Output key is required');
+    }
+
     const tmpIn = join(this.uploadsDir, `tmp-in-${randomUUID()}`);
-    const tmpOut = join(this.uploadsDir, options.outputKey + '.mp4');
+    const outputKey = `${sanitizeUploadName(options.outputKey)}.mp4`;
+    const tmpOut = this.localPathForKey(outputKey);
     try {
       if (options.inputUrl) {
-        // fetch and save
-        const res = await fetch(options.inputUrl);
-        const buffer = Buffer.from(await res.arrayBuffer());
+        const buffer = await this.fetchRemoteBuffer(options.inputUrl);
         writeFileSync(tmpIn, buffer);
       } else if (options.inputKey) {
-        // assume local key
         const src = this.localPathForKey(options.inputKey);
-        writeFileSync(tmpIn, Buffer.from(require('fs').readFileSync(src)));
+        if (!existsSync(src)) throw new BadRequestException('Input file not found');
+        writeFileSync(tmpIn, Buffer.from(readFileSync(src)));
       }
 
       // build ffmpeg args
@@ -96,7 +117,7 @@ export class UploadsService {
           const client = new S3Client({ region: process.env.AWS_REGION });
           const bucket = process.env.AWS_S3_BUCKET;
           const outBuffer = require('fs').readFileSync(tmpOut);
-          const outKey = `processed/${options.outputKey}.mp4`;
+          const outKey = `processed/${outputKey}`;
           const cmd = new PutObjectCommand({ Bucket: bucket, Key: outKey, Body: outBuffer, ContentType: 'video/mp4' });
           await client.send(cmd);
           const publicUrl = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${outKey}`;
@@ -107,25 +128,24 @@ export class UploadsService {
         }
       }
 
-      // return local path to processed file
-      return { processedPath: tmpOut };
+      return { processedPath: tmpOut, publicUrl: this.publicUrlForKey(outputKey), key: outputKey };
     } catch (e) {
       logger.error('processMedia error: ' + e.message);
       throw e;
+    } finally {
+      if (existsSync(tmpIn)) unlinkSync(tmpIn);
     }
   }
 
   async fetchRemoteAndSave(url: string) {
     try {
-      const res = await fetch(url);
-      const contentType = res.headers.get('content-type') || 'application/octet-stream';
-      const ext = contentType.includes('svg') ? 'svg' : contentType.includes('png') ? 'png' : contentType.includes('jpeg') ? 'jpg' : 'bin';
+      const { buffer, contentType } = await this.fetchRemoteBufferWithType(url);
+      assertAllowedUploadMime(contentType);
+      const ext = this.extensionForContentType(contentType);
       const key = `${Date.now()}-${randomUUID()}.${ext}`;
       const outPath = this.localPathForKey(key);
-      const buffer = Buffer.from(await res.arrayBuffer());
       writeFileSync(outPath, buffer);
-      const serverBase = process.env.SERVER_BASE_URL ?? 'http://localhost:3000';
-      const publicUrl = `${serverBase}/uploads/${key}`;
+      const publicUrl = this.publicUrlForKey(key);
       return { key, publicUrl };
     } catch (e) {
       logger.error('fetchRemoteAndSave error: ' + e.message);
@@ -186,7 +206,7 @@ export class UploadsService {
     const fullPrompt = encodeURIComponent(finalPromptText);
     const aiEngineUrl = `https://image.pollinations.ai/prompt/${fullPrompt}?width=768&height=768&seed=${rawSeed}&nologo=true`;
 
-    logger.log(`Generating AI image: prompt="${finalPromptText}", seed=${rawSeed}`);
+    logger.log(`Generating AI image: seed=${rawSeed}`);
 
     try {
       const controller = new AbortController();
@@ -204,8 +224,7 @@ export class UploadsService {
           const key = `${Date.now()}-${randomUUID()}.jpg`;
           const outPath = this.localPathForKey(key);
           writeFileSync(outPath, buffer);
-          const serverBase = process.env.SERVER_BASE_URL ?? 'http://localhost:3000';
-          const publicUrl = `${serverBase}/uploads/${key}`;
+          const publicUrl = this.publicUrlForKey(key);
           return { key, publicUrl, prompt: finalPromptText, style, gender };
         }
       }
@@ -243,6 +262,47 @@ export class UploadsService {
 
   async generateAi(seed?: string) {
     return this.generateRealisticAi(seed ? `Photorealistic creator avatar named ${seed}` : undefined);
+  }
+
+  private async fetchRemoteBuffer(url: string) {
+    return (await this.fetchRemoteBufferWithType(url)).buffer;
+  }
+
+  private async fetchRemoteBufferWithType(url: string) {
+    assertSafeRemoteUrl(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new BadRequestException('Remote file could not be fetched');
+
+      const contentLength = Number(res.headers.get('content-length') || 0);
+      if (contentLength > MAX_UPLOAD_BYTES) throw new BadRequestException('Remote file is too large');
+
+      const contentType = (res.headers.get('content-type') || 'application/octet-stream').split(';')[0].toLowerCase();
+      const buffer = Buffer.from(await res.arrayBuffer());
+      if (buffer.length > MAX_UPLOAD_BYTES) throw new BadRequestException('Remote file is too large');
+      return { buffer, contentType };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private extensionForContentType(contentType: string) {
+    if (contentType.includes('svg')) return 'svg';
+    if (contentType.includes('jpeg')) return 'jpg';
+    if (contentType.includes('png')) return 'png';
+    if (contentType.includes('gif')) return 'gif';
+    if (contentType.includes('webp')) return 'webp';
+    if (contentType.includes('mp4')) return 'mp4';
+    if (contentType.includes('webm')) return 'webm';
+    if (contentType.includes('quicktime')) return 'mov';
+    return extname(contentType) || 'jpg';
+  }
+
+  private publicUrlForKey(key: string) {
+    const serverBase = process.env.SERVER_BASE_URL ?? 'http://localhost:3000';
+    return `${serverBase}/uploads/${key}`;
   }
 }
 

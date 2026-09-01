@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../api/client';
+import { api, getAvatarUrl } from '../api/client';
 import AvatarActionsModal from '../components/AvatarActionsModal';
 import ImageEditor from '../components/ImageEditor';
 import {
@@ -119,7 +119,7 @@ export default function SettingsPage() {
     }
   };
 
-  const currentAvatar = user?.profileImage || user?.avatarUrl || '/placeholder-avatar.png';
+  const currentAvatar = getAvatarUrl(user);
 
   return (
     <div className="zq-settings-page">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessagesIcon } from './Icons';
-import { api, User } from '../api/client';
+import { api, User, getAvatarUrl, getDefaultAvatar } from '../api/client';
 
 export default function FloatingMessagesWidget() {
   const navigate = useNavigate();
@@ -91,7 +91,7 @@ export default function FloatingMessagesWidget() {
               >
                 <div className="zq-avatar-ring" style={{ width: '40px', height: '40px' }}>
                   <img
-                    src={u.profileImage || u.avatarUrl || '/placeholder-avatar.png'}
+                    src={getAvatarUrl(u)}
                     alt={u.name}
                     className="zq-avatar-img"
                   />
@@ -116,7 +116,7 @@ export default function FloatingMessagesWidget() {
           {sampleAvatars.map((u, i) => (
             <img
               key={u.id || i}
-              src={u.profileImage || u.avatarUrl || '/placeholder-avatar.png'}
+              src={getAvatarUrl(u)}
               alt="avatar"
               style={{
                 width: '24px',
@@ -127,7 +127,9 @@ export default function FloatingMessagesWidget() {
                 marginLeft: i > 0 ? '-6px' : 0,
               }}
               onError={(e) => {
-                (e.target as HTMLElement).style.display = 'none';
+                const target = e.target as HTMLImageElement;
+                target.onerror = null;
+                target.src = getDefaultAvatar(u.name || u.username);
               }}
             />
           ))}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, getAvatarUrl } from '../api/client';
+import { User, getAvatarUrl, getDefaultAvatar } from '../api/client';
 import { AuraSparkIcon } from './Icons';
 
 interface LiveCallModalProps {
@@ -238,7 +238,9 @@ export default function LiveCallModal({ peer, callType, onEndCall }: LiveCallMod
                     objectFit: 'cover',
                   }}
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = '/placeholder-avatar.png';
+                    const target = e.target as HTMLImageElement;
+                    target.onerror = null;
+                    target.src = getDefaultAvatar(peer.name || peer.username);
                   }}
                 />
               </div>

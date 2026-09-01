@@ -30,4 +30,8 @@ pnpm-debug.log*
 Thumbs.db
 
 # Uploads and temporary files
+backend/prisma/*.db
+backend/prisma/*.db-*
+backend/public/uploads/*
 backend/public/uploads/tmp-*
+backend/tsconfig.tsbuildinfo

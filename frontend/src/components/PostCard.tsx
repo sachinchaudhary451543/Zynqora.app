@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Post, api } from '../api/client';
+import { Post, api, getAvatarUrl, getDefaultAvatar, resolveMediaUrl } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import CommentsSection from './CommentsSection';
 import {
@@ -23,8 +23,8 @@ export default function PostCard({ post }: { post: Post }) {
 
   const authorAvatar =
     post.author.username === user?.username
-      ? user.profileImage || post.author.avatarUrl
-      : post.author.profileImage || post.author.avatarUrl || '/placeholder-avatar.png';
+      ? getAvatarUrl(user)
+      : getAvatarUrl(post.author);
 
   const formatTimeAgo = (dateString: string) => {
     const diff = (Date.now() - new Date(dateString).getTime()) / 1000;
@@ -79,6 +79,17 @@ export default function PostCard({ post }: { post: Post }) {
     }
   };
 
+  const getYouTubeEmbedUrl = (url?: string | null) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      return `https://www.youtube.com/embed/${match[2]}`;
+    }
+    return null;
+  };
+
+  const ytEmbedUrl = getYouTubeEmbedUrl(post.mediaUrl);
   const isVideo = post.mediaType === 'video' || (post.mediaUrl && (post.mediaUrl.endsWith('.mp4') || post.mediaUrl.endsWith('.webm')));
 
   // Circle Badge determined by post content or author
@@ -94,11 +105,13 @@ export default function PostCard({ post }: { post: Post }) {
           <Link to={`/profile/${post.author.username}`}>
             <div className="zq-avatar-ring" style={{ width: '38px', height: '38px' }}>
               <img
-                src={authorAvatar || '/placeholder-avatar.png'}
+                src={authorAvatar}
                 alt={post.author.name}
                 className="zq-avatar-img"
                 onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = getDefaultAvatar(post.author.name || post.author.username);
                 }}
               />
             </div>
@@ -127,10 +140,24 @@ export default function PostCard({ post }: { post: Post }) {
       {/* Post Media */}
       {post.mediaUrl && (
         <div className="zq-post-media-wrap" onDoubleClick={handleDoubleTap}>
-          {isVideo ? (
-            <video src={post.mediaUrl} controls playsInline />
+          {ytEmbedUrl ? (
+            <iframe
+              src={ytEmbedUrl}
+              title="YouTube video player"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{
+                width: '100%',
+                aspectRatio: '16/9',
+                border: 'none',
+                display: 'block',
+              }}
+            />
+          ) : isVideo ? (
+            <video src={resolveMediaUrl(post.mediaUrl)} controls playsInline />
           ) : (
-            <img src={post.mediaUrl} alt="Sync media" />
+            <img src={resolveMediaUrl(post.mediaUrl)} alt="Sync media" />
           )}
 
           {/* Holographic Spark Explosion */}

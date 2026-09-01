@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { api } from '../api/client';
+import { api, getAvatarUrl, normalizeConnectionUsers } from '../api/client';
 
 export default function FollowingPage() {
   const { username } = useParams<{ username: string }>();
@@ -12,7 +12,7 @@ export default function FollowingPage() {
       if (!username) return;
       try {
         const res = await api.getFollowing(username);
-        setList(res || []);
+        setList(normalizeConnectionUsers(res, 'following'));
       } catch (err: any) {
         setError(err.message);
       }
@@ -27,7 +27,7 @@ export default function FollowingPage() {
       {list.length === 0 && <p className="muted">Not following anyone yet.</p>}
       {list.map((f) => (
         <div key={f.id} style={{ display: 'flex', gap: 12, alignItems: 'center', padding: 8 }}>
-          <img src={f.following.profileImage || f.following.avatarUrl || '/placeholder-avatar.png'} alt="a" style={{ width: 48, height: 48, borderRadius: 8 }} />
+          <img src={getAvatarUrl(f.following)} alt="a" style={{ width: 48, height: 48, borderRadius: 8 }} />
           <div>
             <div style={{ fontWeight: 600 }}>{f.following.name}</div>
             <div className="muted">@{f.following.username}</div>

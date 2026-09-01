@@ -1,6 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
+import {
+  assertCanViewByVisibility,
+  authorSelect,
+  getFollowSets,
+  normalizePostVisibility,
+  visibleContentWhere,
+} from '../common/social-access';
 
 @Injectable()
 export class PostsService {
@@ -17,10 +24,10 @@ export class PostsService {
         content: dto.content,
         mediaUrl: dto.mediaUrl,
         mediaType: dto.mediaType,
-        visibility: dto.visibility ?? 'FOLLOWERS',
+        visibility: normalizePostVisibility(dto.visibility),
       },
       include: {
-        author: { select: { username: true, name: true, avatarUrl: true, profileImage: true } },
+        author: { select: authorSelect },
         _count: { select: { likes: true, comments: true } },
       },
     });
@@ -29,20 +36,15 @@ export class PostsService {
   // Feed = posts from people the current user follows, plus their own posts,
   // filtered so FOLLOWERS-only posts require the author to also follow back.
   async getFeed(userId: string, cursor?: string, limit = 20) {
-    const following = await this.prisma.follow.findMany({
-      where: { followerId: userId },
-      select: { followingId: true },
-    });
-    const followingIds = following.map((f) => f.followingId);
-    const authorIds = [...followingIds, userId];
+    const { followingIds, mutualIds } = await getFollowSets(this.prisma, userId);
 
     const posts = await this.prisma.post.findMany({
-      where: { authorId: { in: authorIds } },
+      where: visibleContentWhere(userId, followingIds, mutualIds),
       orderBy: { createdAt: 'desc' },
       take: limit,
       ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
       include: {
-        author: { select: { username: true, name: true, avatarUrl: true, profileImage: true } },
+        author: { select: authorSelect },
         _count: { select: { likes: true, comments: true } },
       },
     });
@@ -53,14 +55,25 @@ export class PostsService {
     };
   }
 
-  async getUserPosts(username: string) {
+  async getUserPosts(username: string, viewerId: string) {
+    const { followingIds, mutualIds } = await getFollowSets(this.prisma, viewerId);
     return this.prisma.post.findMany({
-      where: { author: { username } },
+      where: {
+        author: { username },
+        ...visibleContentWhere(viewerId, followingIds, mutualIds),
+      },
       orderBy: { createdAt: 'desc' },
       include: {
-        author: { select: { username: true, name: true, avatarUrl: true, profileImage: true } },
+        author: { select: authorSelect },
         _count: { select: { likes: true, comments: true } },
       },
     });
+  }
+
+  async ensureCanViewPost(viewerId: string, postId: string) {
+    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+    if (!post) throw new BadRequestException('Post not found');
+    await assertCanViewByVisibility(this.prisma, viewerId, post.authorId, post.visibility);
+    return post;
   }
 }

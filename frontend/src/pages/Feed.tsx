@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, Post } from '../api/client';
+import { api, Post, getAvatarUrl, getDefaultAvatar, resolveMediaUrl } from '../api/client';
 import PostCard from '../components/PostCard';
 import Suggestions from '../components/Suggestions';
 import StoryViewerModal from '../components/StoryViewerModal';
@@ -109,7 +109,7 @@ export default function Feed() {
   }, []);
 
   const storiesToShow = activeStories.length > 0 ? activeStories : sampleStories;
-  const userAvatar = user?.profileImage || user?.avatarUrl || '/placeholder-avatar.png';
+  const userAvatar = getAvatarUrl(user);
 
   // Filter posts if circle is selected
   const filteredPosts = posts.filter((p) => {
@@ -144,50 +144,124 @@ export default function Feed() {
             onClick={() => setShowStoryRecorder(true)}
             title="Create an Aura Moment"
           >
-            <div className="zq-story-glow-ring" style={{ background: 'var(--zq-glass-border)' }}>
+            <div className="zq-story-card">
               <img
                 src={userAvatar}
                 alt="My Aura"
-                className="zq-story-inner-avatar"
+                className="zq-story-preview"
+                style={{ filter: 'blur(4px) brightness(0.5)', transform: 'scale(1.08)' }}
                 onError={(e) => {
-                  (e.target as HTMLElement).style.display = 'none';
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = getDefaultAvatar(user?.name || user?.username);
                 }}
               />
+              <div className="zq-story-overlay" />
+              <div className="zq-story-glow-ring" style={{ background: 'rgba(0,223,216,0.25)', border: '2px dashed rgba(0,223,216,0.7)' }}>
+                <img
+                  src={userAvatar}
+                  alt="My Aura"
+                  className="zq-story-inner-avatar"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.onerror = null;
+                    target.src = getDefaultAvatar(user?.name || user?.username);
+                  }}
+                />
+              </div>
+              {/* Plus icon */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -28%)',
+                fontSize: '22px',
+                color: 'rgba(0,223,216,0.9)',
+                fontWeight: 900,
+                textShadow: '0 0 8px rgba(0,223,216,0.8)',
+                zIndex: 3,
+                lineHeight: 1,
+              }}>+</div>
             </div>
+            {/* Username OUTSIDE card so it's never clipped */}
             <span className="zq-story-username" style={{ color: 'var(--zq-accent-cyan)' }}>+ Add Aura</span>
           </div>
 
           {/* Stories */}
-          {storiesToShow.map((story) => (
-            <div
-              key={story.id}
-              className="zq-story-item"
-              onClick={() =>
-                setViewingStory({
-                  id: story.id,
-                  title: story.author?.username || story.title || 'Aura Moment',
-                  authorName: story.author?.name || story.authorName,
-                  authorAvatar: story.author?.profileImage || story.author?.avatarUrl || story.authorAvatar,
-                  mediaUrl: story.videoUrl || story.mediaUrl,
-                  type: story.videoUrl ? 'video' : 'image',
-                })
-              }
-            >
-              <div className="zq-story-glow-ring">
-                <img
-                  src={story.author?.profileImage || story.author?.avatarUrl || story.authorAvatar || '/placeholder-avatar.png'}
-                  alt={story.title}
-                  className="zq-story-inner-avatar"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
+          {storiesToShow.map((story) => {
+            const storyAvatar = getAvatarUrl({
+              name: story.author?.name || story.authorName,
+              username: story.author?.username || story.title,
+              profileImage: story.author?.profileImage,
+              avatarUrl: story.author?.avatarUrl || story.authorAvatar,
+            });
+            // Real API stories use 'videoUrl' + 'thumbnail'; sample stories use 'mediaUrl'
+            const storyPreview = story.thumbnail || story.mediaUrl || story.videoUrl || storyAvatar;
+            const storyUsername = story.author?.username || story.title || user?.username || 'Aura';
+            // Stories use a legacy `videoUrl` field for both images and videos.
+            // Choose the element from the actual media extension so uploaded
+            // photos are not rendered inside a <video> tag.
+            const mediaUrl = story.videoUrl || story.mediaUrl || story.thumbnail || '';
+            const isVideo = /\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(mediaUrl);
+
+            return (
+              <div
+                key={story.id}
+                className="zq-story-item"
+                onClick={() =>
+                  setViewingStory({
+                    id: story.id,
+                    title: storyUsername,
+                    authorName: story.author?.name || story.authorName,
+                    authorAvatar: story.author?.profileImage || story.author?.avatarUrl || story.authorAvatar,
+                    mediaUrl,
+                    type: isVideo ? 'video' : 'image',
+                  })
+                }
+              >
+                <div className="zq-story-card">
+                  {/* Story preview — use thumbnail/image if available, otherwise video */}
+                  {isVideo ? (
+                    <video
+                      src={resolveMediaUrl(mediaUrl)}
+                      className="zq-story-preview"
+                      muted
+                      playsInline
+                      preload="metadata"
+                      style={{ objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <img
+                      src={resolveMediaUrl(storyPreview)}
+                      alt={storyUsername}
+                      className="zq-story-preview"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = getDefaultAvatar(story.author?.name || story.author?.username || story.title);
+                      }}
+                    />
+                  )}
+                  <div className="zq-story-overlay" />
+                  {/* Author avatar ring */}
+                  <div className="zq-story-glow-ring">
+                    <img
+                      src={storyAvatar}
+                      alt={storyUsername}
+                      className="zq-story-inner-avatar"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = getDefaultAvatar(story.author?.name || story.title);
+                      }}
+                    />
+                  </div>
+                </div>
+                {/* Username OUTSIDE card so it's never clipped by overflow:hidden */}
+                <span className="zq-story-username">{storyUsername}</span>
               </div>
-              <span className="zq-story-username">
-                {story.author?.username || story.title}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Story Recorder Modal */}

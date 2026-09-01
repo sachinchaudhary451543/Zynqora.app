@@ -41,6 +41,7 @@ async function bootstrap() {
   app.useStaticAssets(join(process.cwd(), 'public'));
 
   const port = process.env.PORT ?? 3000;
+  app.enableShutdownHooks();
   await app.listen(port);
   console.log(`Backend running on http://localhost:${port}/api`);
 }

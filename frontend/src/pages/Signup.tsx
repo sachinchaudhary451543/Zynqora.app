@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../api/client';
 import { ZynqoraLogo, ZynqoraWordmark } from '../components/Icons';
+import AuthNotice from '../components/AuthNotice';
 
 export default function Signup() {
   const { signup } = useAuth();
@@ -9,13 +11,29 @@ export default function Signup() {
   const [form, setForm] = useState({ email: '', username: '', password: '', name: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [usernameStatus, setUsernameStatus] = useState<{ available: boolean; valid: boolean; message: string } | null>(null);
+
+  React.useEffect(() => {
+    const username = form.username.trim();
+    if (!username) { setUsernameStatus(null); return; }
+    const timer = window.setTimeout(async () => {
+      try { setUsernameStatus(await api.checkUsername(username)); }
+      catch { setUsernameStatus({ available: false, valid: false, message: 'Could not check username availability.' }); }
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [form.username]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!/^[a-zA-Z0-9_.]{3,30}$/.test(form.username.trim())) { setError('Username must be 3–30 characters using only letters, numbers, underscores or dots.'); return; }
+    if (usernameStatus && (!usernameStatus.valid || !usernameStatus.available)) { setError(usernameStatus.message); return; }
+    if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return; }
     setLoading(true);
     try {
-      await signup(form);
+      const code = await signup(form);
+      if (code) { setRecoveryCode(code); setError('Save this private recovery code. It is required to recover your account.'); }
       navigate('/feed');
     } catch (err: any) {
       setError(err.message || 'Registration failed');
@@ -60,6 +78,11 @@ export default function Signup() {
             onChange={(e) => setForm({ ...form, username: e.target.value })}
             required
           />
+          {usernameStatus && (
+            <div style={{ color: usernameStatus.available ? 'var(--zq-accent-cyan)' : 'var(--zq-danger)', fontSize: '11px', margin: '-4px 0 8px', fontWeight: 600 }}>
+              {usernameStatus.message}
+            </div>
+          )}
           <input
             type="password"
             className="zq-auth-input"
@@ -69,11 +92,8 @@ export default function Signup() {
             required
           />
 
-          {error && (
-            <div style={{ color: 'var(--zq-danger)', fontSize: '12px', margin: '8px 0', fontWeight: 600 }}>
-              {error}
-            </div>
-          )}
+        {error && <AuthNotice type={recoveryCode ? 'warning' : 'error'}>{error}</AuthNotice>}
+        {recoveryCode && <div style={{ padding: '10px', margin: '8px 0', border: '1px solid var(--zq-accent-cyan)', borderRadius: 8, color: 'var(--zq-accent-cyan)', fontFamily: 'monospace', textAlign: 'center' }}>{recoveryCode}</div>}
 
           <p style={{ fontSize: '11px', color: 'var(--zq-text-muted)', margin: '12px 0', lineHeight: '15px' }}>
             By initializing your Zynqora presence, you agree to our Community Circle Protocols and Data Privacy Shields.
@@ -82,7 +102,7 @@ export default function Signup() {
           <button
             type="submit"
             className="zq-auth-btn"
-            disabled={loading || !form.email || !form.password || !form.username || !form.name}
+            disabled={loading || !form.email || !form.password || !form.username || !form.name || !usernameStatus?.available}
           >
             {loading ? 'Initializing Circle...' : '⚡ Join Zynqora'}
           </button>

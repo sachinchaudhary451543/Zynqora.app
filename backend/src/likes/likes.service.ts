@@ -1,13 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PostsService } from '../posts/posts.service';
 
 @Injectable()
 export class LikesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly postsService: PostsService,
+  ) {}
 
   async like(userId: string, postId: string) {
-    const post = await this.prisma.post.findUnique({ where: { id: postId } });
-    if (!post) throw new NotFoundException('Post not found');
+    await this.postsService.ensureCanViewPost(userId, postId);
 
     await this.prisma.like.upsert({
       where: { postId_userId: { postId, userId } },
@@ -26,7 +29,8 @@ export class LikesService {
     return { liked: false };
   }
 
-  async getLikes(postId: string) {
+  async getLikes(viewerId: string, postId: string) {
+    await this.postsService.ensureCanViewPost(viewerId, postId);
     const likes = await this.prisma.like.findMany({
       where: { postId },
       include: { user: { select: { id: true, username: true, name: true } } },

@@ -1,19 +1,62 @@
+// Use the same-origin API in production; localhost is only a development default.
+const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? 'http://localhost:3000/api' : '/api');
+
+function getApiOrigin() {
+  try {
+    return new URL(API_BASE, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000').origin;
+  } catch {
+    return 'http://localhost:3000';
+  }
+}
+
+export function getDefaultAvatar(nameOrUsername?: string | null): string {
+  const seed = (nameOrUsername || 'Zynqora User').trim();
+  const initial = (seed.charAt(0) || 'Z').toUpperCase();
+  const colors = [
+    ['#00dfd8', '#7928ca'],
+    ['#7928ca', '#ff0080'],
+    ['#ff0080', '#f9cb28'],
+    ['#0070f3', '#00dfd8'],
+    ['#10b981', '#06b6d4'],
+  ];
+  const charCode = seed.charCodeAt(0) || 0;
+  const [c1, c2] = colors[charCode % colors.length];
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+    <defs>
+      <linearGradient id="g_${charCode}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${c1}"/>
+        <stop offset="100%" stop-color="${c2}"/>
+      </linearGradient>
+    </defs>
+    <rect width="100" height="100" rx="50" fill="url(#g_${charCode})"/>
+    <text x="50" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="44" font-weight="bold" fill="#ffffff" text-anchor="middle" dominant-baseline="alphabetic">${initial}</text>
+  </svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 export function resolveMediaUrl(url?: string | null): string {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.startsWith('data:')) {
     return url;
   }
   if (url.startsWith('/uploads/')) {
-    return `http://localhost:3000${url}`;
+    return `${getApiOrigin()}${url}`;
   }
   return url;
 }
 
-export function getAvatarUrl(user?: { profileImage?: string | null; avatarUrl?: string | null } | null): string {
-  if (!user) return '/placeholder-avatar.png';
+export function getAvatarUrl(user?: { username?: string | null; name?: string | null; profileImage?: string | null; avatarUrl?: string | null } | null): string {
+  if (!user) return getDefaultAvatar('Z');
   const img = user.profileImage || user.avatarUrl;
-  if (!img) return '/placeholder-avatar.png';
+  if (!img || img === '/placeholder-avatar.png') return getDefaultAvatar(user.name || user.username);
   return resolveMediaUrl(img);
+}
+
+export function normalizeConnectionUsers(records: any[] | undefined, relation: 'follower' | 'following') {
+  if (!Array.isArray(records)) return [];
+  return records.map((record) => record?.[relation] ?? record).filter((user) => user?.username && user?.name);
 }
 
 export interface User {
@@ -23,6 +66,7 @@ export interface User {
   name: string;
   avatarUrl?: string | null;
   profileImage?: string | null;
+  bannerImage?: string | null;
   bio?: string | null;
   website?: string | null;
   category?: string | null;
@@ -47,6 +91,7 @@ export interface Post {
     name: string;
     avatarUrl: string | null;
     profileImage?: string | null;
+    bannerImage?: string | null;
   };
   _count?: { likes: number; comments: number };
   isLiked?: boolean;
@@ -62,39 +107,57 @@ export interface Comment {
     name: string;
     avatarUrl: string | null;
     profileImage?: string | null;
+    bannerImage?: string | null;
   };
 }
-
-const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:3000/api';
 
 function getToken() {
   return localStorage.getItem('token');
 }
 
+async function parseError(res: Response) {
+  const body = await res.json().catch(() => ({ message: res.statusText }));
+  return Array.isArray(body.message) ? body.message.join(', ') : body.message;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    });
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ message: res.statusText }));
-    const message = Array.isArray(body.message) ? body.message.join(', ') : body.message;
-    throw new Error(message || 'Request failed');
+    if (!res.ok) {
+      if (res.status === 401 && !path.startsWith('/auth/')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+          window.location.href = '/login';
+        }
+      }
+      const message = await parseError(res);
+      throw new Error(message || 'Request failed');
+    }
+
+    if (res.status === 204) return undefined as T;
+    return res.json();
+  } catch (err: any) {
+    if (err.name === 'TypeError' && (err.message === 'Failed to fetch' || err.message.includes('fetch'))) {
+      throw new Error('Cannot connect to backend server. Please verify backend is running on http://localhost:3000.');
+    }
+    throw err;
   }
-
-  if (res.status === 204) return undefined as T;
-  return res.json();
 }
+
 
 export const api = {
   signup: (data: { email: string; username: string; password: string; name: string }) =>
-    request<{ token: string; user: User }>('/auth/signup', {
+    request<{ token: string; user: User; recoveryCode: string }>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -104,6 +167,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  checkUsername: (username: string) =>
+    request<{ available: boolean; valid: boolean; message: string }>(`/auth/username-availability?username=${encodeURIComponent(username)}`),
+  forgotPassword: (identifier: string, recoveryCode: string) => request<{ message: string; resetToken?: string }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ identifier, recoveryCode }) }),
+  resetPassword: (token: string, password: string) => request<{ message: string }>('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
 
   getProfile: (username: string) => request<User>(`/users/${username}`),
 
@@ -118,6 +185,7 @@ export const api = {
     note?: string;
     avatarUrl?: string;
     profileImage?: string | null;
+    bannerImage?: string | null;
   }) => request<User>('/users/me', { method: 'PATCH', body: JSON.stringify(data) }),
 
   updatePrivacy: (data: { profileVisibility?: string; followersVisibility?: string; followingVisibility?: string }) =>
@@ -164,7 +232,10 @@ export const api = {
       method: 'POST',
       headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: fd,
-    }).then((r) => r.json());
+    }).then(async (r) => {
+      if (!r.ok) throw new Error((await parseError(r)) || 'Upload failed');
+      return r.json();
+    });
   },
   processMedia: (payload: any): Promise<{ publicUrl?: string; processedPath?: string }> =>
     request('/uploads/process', { method: 'POST', body: JSON.stringify(payload) }),
@@ -177,5 +248,3 @@ export const api = {
   aiModifyImage: (data: { imageUrl?: string; prompt: string; style?: string; gender?: string }) =>
     request<{ key: string; publicUrl: string; prompt?: string; style?: string; gender?: string }>('/uploads/ai-modify', { method: 'POST', body: JSON.stringify(data) }),
 };
-
-

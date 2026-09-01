@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AuraSparkIcon } from './Icons';
+import { getDefaultAvatar, getAvatarUrl, resolveMediaUrl } from '../api/client';
 
 interface StoryItem {
   id: string;
@@ -50,6 +51,12 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
     story.type === 'video' ||
     story.mediaUrl?.endsWith('.webm') ||
     story.mediaUrl?.endsWith('.mp4');
+
+  const avatarSrc = getAvatarUrl({
+    name: story.authorName,
+    username: story.title,
+    avatarUrl: story.authorAvatar,
+  });
 
   return (
     <div
@@ -128,10 +135,14 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
               }}
             >
               <img
-                src={story.authorAvatar || '/placeholder-avatar.png'}
+                src={avatarSrc}
                 alt={story.title}
                 style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-                onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-avatar.png'; }}
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  target.src = getDefaultAvatar(story.authorName || story.title);
+                }}
               />
             </div>
             <div>
@@ -168,7 +179,7 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
         <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
           {isVideo ? (
             <video
-              src={story.mediaUrl}
+              src={resolveMediaUrl(story.mediaUrl)}
               autoPlay
               loop
               playsInline
@@ -176,7 +187,7 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
             />
           ) : (
             <img
-              src={story.mediaUrl}
+              src={resolveMediaUrl(story.mediaUrl)}
               alt={story.title}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />

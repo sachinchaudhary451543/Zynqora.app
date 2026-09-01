@@ -10,6 +10,7 @@ import { SuggestionsModule } from './suggestions/suggestions.module';
 import { StoriesModule } from './stories/stories.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { ChatModule } from './chat/chat.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -25,5 +26,6 @@ import { ChatModule } from './chat/chat.module';
     UploadsModule,
     ChatModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

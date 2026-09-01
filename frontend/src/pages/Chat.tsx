@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { api, User, getAvatarUrl } from '../api/client';
+import { api, User, getAvatarUrl, getDefaultAvatar } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { MessagesIcon, SearchIcon } from '../components/Icons';
 import LiveCallModal from '../components/LiveCallModal';
@@ -228,7 +228,11 @@ export default function ChatPage() {
                         src={avatar}
                         alt={cUser.name}
                         style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
-                        onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-avatar.png'; }}
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = getDefaultAvatar(cUser.name || cUser.username);
+                        }}
                       />
                       <span
                         style={{
@@ -311,7 +315,11 @@ export default function ChatPage() {
                       src={activeAvatar}
                       alt={activeUser?.name || activeUsername}
                       style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
-                      onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder-avatar.png'; }}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = getDefaultAvatar(activeUser?.name || activeUsername || '');
+                      }}
                     />
                   </div>
                   <div>

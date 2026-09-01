@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { normalizeProfileVisibility } from '../common/social-access';
 
 @Injectable()
 export class UsersService {
@@ -15,6 +16,7 @@ export class UsersService {
         bio: true,
         avatarUrl: true,
         profileImage: true,
+        bannerImage: true,
         website: true,
         category: true,
         note: true,
@@ -27,19 +29,23 @@ export class UsersService {
     });
     if (!user) throw new NotFoundException('User not found');
 
+    const relation = viewerId && viewerId !== user.id
+      ? await this.prisma.follow.findUnique({
+          where: { followerId_followingId: { followerId: viewerId, followingId: user.id } },
+        })
+      : null;
+    const profile = { ...user, isFollowing: Boolean(relation) };
+
     // Owner always sees full profile
-    if (viewerId && viewerId === user.id) return user;
+    if (viewerId && viewerId === user.id) return profile;
 
     // PUBLIC profiles are visible
-    if (user.profileVisibility === 'PUBLIC') return user;
+    if (user.profileVisibility === 'PUBLIC') return profile;
 
     // FOLLOWERS_ONLY: allow only if viewer follows this user
     if (user.profileVisibility === 'FOLLOWERS_ONLY') {
       if (!viewerId) throw new ForbiddenException('Profile is visible to followers only');
-      const relation = await this.prisma.follow.findUnique({
-        where: { followerId_followingId: { followerId: viewerId, followingId: user.id } },
-      });
-      if (relation) return user;
+      if (relation) return profile;
       throw new ForbiddenException('Profile is visible to followers only');
     }
 
@@ -47,12 +53,13 @@ export class UsersService {
     throw new ForbiddenException('Profile is private');
   }
 
-  async updateProfile(userId: string, data: { name?: string; bio?: string; avatarUrl?: string; profileImage?: string; website?: string; category?: string; note?: string }) {
+  async updateProfile(userId: string, data: { name?: string; bio?: string; avatarUrl?: string; profileImage?: string | null; bannerImage?: string | null; website?: string; category?: string; note?: string }) {
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.bio !== undefined) updateData.bio = data.bio;
     if (data.avatarUrl !== undefined) updateData.avatarUrl = data.avatarUrl;
     if (data.profileImage !== undefined) updateData.profileImage = data.profileImage;
+    if (data.bannerImage !== undefined) updateData.bannerImage = data.bannerImage;
     if (data.website !== undefined) updateData.website = data.website;
     if (data.category !== undefined) updateData.category = data.category;
     if (data.note !== undefined) updateData.note = data.note;
@@ -60,7 +67,7 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id: userId },
       data: updateData,
-      select: { id: true, username: true, name: true, bio: true, avatarUrl: true, profileImage: true, website: true, category: true, note: true },
+      select: { id: true, username: true, name: true, bio: true, avatarUrl: true, profileImage: true, bannerImage: true, website: true, category: true, note: true },
     });
   }
 
@@ -68,9 +75,9 @@ export class UsersService {
     return this.prisma.user.update({
       where: { id: userId },
       data: {
-        profileVisibility: data.profileVisibility,
-        followersVisibility: data.followersVisibility,
-        followingVisibility: data.followingVisibility,
+        profileVisibility: data.profileVisibility ? normalizeProfileVisibility(data.profileVisibility) : undefined,
+        followersVisibility: data.followersVisibility ? normalizeProfileVisibility(data.followersVisibility) : undefined,
+        followingVisibility: data.followingVisibility ? normalizeProfileVisibility(data.followingVisibility) : undefined,
       },
       select: { id: true, profileVisibility: true, followersVisibility: true, followingVisibility: true },
     });

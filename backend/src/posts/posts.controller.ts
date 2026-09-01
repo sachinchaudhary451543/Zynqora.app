@@ -20,7 +20,7 @@ export class PostsController {
   }
 
   @Get('user/:username')
-  getUserPosts(@Param('username') username: string) {
-    return this.postsService.getUserPosts(username);
+  getUserPosts(@CurrentUser() user: { userId: string }, @Param('username') username: string) {
+    return this.postsService.getUserPosts(username, user.userId);
   }
 }

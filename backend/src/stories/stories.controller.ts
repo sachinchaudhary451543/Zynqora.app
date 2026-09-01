@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { StoriesService } from './stories.service';
@@ -15,14 +15,13 @@ export class StoriesController {
 
   @UseGuards(JwtAuthGuard)
   @Get('active')
-  active() {
-    return this.storiesService.getActiveStories();
+  active(@CurrentUser() user: { userId: string }) {
+    return this.storiesService.getActiveStories(user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':username')
-  forUser(@Body() body: any) {
-    // note: route param will be handled client side; return empty - client should call GET /stories/active or /stories/:username
-    return [];
+  forUser(@CurrentUser() user: { userId: string }, @Param('username') username: string) {
+    return this.storiesService.getActiveStoriesForUser(username, user.userId);
   }
 }

@@ -19,7 +19,7 @@ export class ChatController {
   }
 
   @Get('conversation/:id/messages')
-  getMessages(@Param('id') id: string) {
-    return this.chatService.getMessages(id);
+  getMessages(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
+    return this.chatService.getMessages(id, user.userId);
   }
 }

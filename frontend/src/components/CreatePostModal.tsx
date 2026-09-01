@@ -13,7 +13,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
   const [mediaType, setMediaType] = useState<'image' | 'video' | ''>('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [targetCircle, setTargetCircle] = useState('global');
+  const [visibility, setVisibility] = useState<'TREE' | 'FOLLOWERS' | 'CIRCLE'>('FOLLOWERS');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -24,6 +24,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
     const file = e.target.files?.[0];
     if (!file) return;
     setMediaFile(file);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     setMediaType(file.type.startsWith('video') ? 'video' : 'image');
@@ -58,12 +59,14 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
         content: content.trim() || undefined,
         mediaUrl: finalMediaUrl,
         mediaType: mediaType || undefined,
+        visibility,
       });
 
       setContent('');
       setMediaUrl('');
       setMediaType('');
       setMediaFile(null);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
       onPostCreated();
       onClose();
@@ -102,16 +105,15 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
             </label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {[
-                { id: 'global', name: '🌍 Global Sync' },
-                { id: 'tech', name: '🚀 Tech Innovators' },
-                { id: 'family', name: '🏡 Family Circle' },
-                { id: 'creative', name: '🎨 Creative Hub' },
+                { id: 'TREE', name: 'Tree' },
+                { id: 'FOLLOWERS', name: 'Followers' },
+                { id: 'CIRCLE', name: 'Circle' },
               ].map((c) => (
                 <button
                   key={c.id}
                   type="button"
-                  className={`zq-circle-pill ${targetCircle === c.id ? 'active' : ''}`}
-                  onClick={() => setTargetCircle(c.id)}
+                  className={`zq-circle-pill ${visibility === c.id ? 'active' : ''}`}
+                  onClick={() => setVisibility(c.id as 'TREE' | 'FOLLOWERS' | 'CIRCLE')}
                   style={{ padding: '6px 14px', fontSize: '12px' }}
                 >
                   {c.name}
@@ -132,6 +134,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
                 type="button"
                 onClick={() => {
                   setMediaFile(null);
+                  if (previewUrl) URL.revokeObjectURL(previewUrl);
                   setPreviewUrl(null);
                 }}
                 style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(0,0,0,0.75)', color: '#fff', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer' }}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { api, User } from '../api/client';
+import { api, User, getAvatarUrl } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import { SearchIcon, CirclesIcon, AuraSparkIcon } from '../components/Icons';
 
@@ -120,7 +120,7 @@ export default function Explore() {
         >
           {filtered.map((u) => {
             const isFollowing = following.has(u.username);
-            const avatar = u.profileImage || u.avatarUrl || '/placeholder-avatar.png';
+            const avatar = getAvatarUrl(u);
 
             return (
               <div
