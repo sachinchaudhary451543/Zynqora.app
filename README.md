@@ -58,12 +58,13 @@ and serve `frontend/dist` from a static host with SPA fallback to `index.html`.
 Build the API with `npm run build` and run `npm start` with a strong
 `JWT_SECRET`, `NODE_ENV=production`, an explicit `DATABASE_URL`, and a
 restricted `CORS_ORIGIN`. The health check is `GET /api/health`.
+The Supabase database is initialized with `npm run prisma:push` for the first
+deployment; use reviewed Prisma migrations for subsequent schema changes.
 
-The current schema uses SQLite for development. For a global deployment,
-migrate the Prisma datasource to managed PostgreSQL (and create a production
-migration) before launch; do not deploy `backend/prisma/dev.db` as shared
-production storage. Configure S3-compatible object storage for uploads rather
-than relying on local `backend/public/uploads`.
+The schema is configured for managed PostgreSQL. Do not deploy
+`backend/prisma/dev.db` as shared production storage. Configure S3-compatible
+object storage for uploads rather than relying on local
+`backend/public/uploads`.
 
 ## Android packaging
 
