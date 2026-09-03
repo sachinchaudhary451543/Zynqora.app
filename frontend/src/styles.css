@@ -1532,6 +1532,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .zq-moment-card img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #eaf2f6; }
 .zq-moment-card span { display: block; padding: 8px; overflow: hidden; color: var(--zq-text-primary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .zq-empty-state { color: var(--zq-text-secondary); font-size: 13px; }
+.zq-active-chat-name { color: var(--zq-text-primary); }
+.zq-active-chat-handle { color: var(--zq-accent-blue); }
 
 [data-theme='light'] .zq-story-username { color: var(--zq-text-primary) !important; }
 
@@ -1550,6 +1552,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .zq-chat-composer input { min-width: 0 !important; flex: 1 1 120px !important; padding: 9px 11px !important; color: var(--zq-text-primary) !important; background: #f4f8fb !important; border-color: #bfd0dc !important; }
   .zq-chat-user-name { color: var(--zq-text-primary) !important; }
   .zq-chat-user-handle { color: var(--zq-text-secondary) !important; }
+  .zq-active-chat-name { color: var(--zq-text-primary) !important; }
+  .zq-active-chat-handle { color: #087c9c !important; }
   .zq-chat-header [style*='color: #fff'] { color: var(--zq-text-primary) !important; }
   .zq-chat-header [style*='#00dfd8'] { color: #087c9c !important; }
   .zq-chat-sidebar-panel [style*='color: #fff'] { color: var(--zq-text-primary) !important; }

@@ -370,11 +370,11 @@ export default function ChatPage() {
                     />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: '15px', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div className="zq-active-chat-name" style={{ fontWeight: 800, fontSize: '15px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       {activeUser?.name || activeUsername}
                       <span style={{ fontSize: '11px', color: '#00dfd8' }}>⚡</span>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#00dfd8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div className="zq-active-chat-handle" style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: activeUser?.id && onlineUsers.has(activeUser.id) ? '#00dfd8' : '#6b7280', display: 'inline-block' }} />
                       <span>Synced • @{activeUsername}</span>
                     </div>

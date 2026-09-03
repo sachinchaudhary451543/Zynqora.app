@@ -684,7 +684,7 @@ export default function Profile() {
           </button>
 
           {/* MOMENTS TAB */}
-          {(isOwnProfile || moments.length > 0) && (
+          <>
             <button 
               onClick={() => setActiveTab('circles')}
               style={{ 
@@ -706,7 +706,7 @@ export default function Profile() {
             >
               <VideoIcon size={16} /> MOMENTS
             </button>
-          )}
+          </>
 
           {/* QORAS TAB */}
           <button 
