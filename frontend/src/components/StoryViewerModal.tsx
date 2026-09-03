@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { AuraSparkIcon } from './Icons';
 import { getDefaultAvatar, getAvatarUrl, resolveMediaUrl } from '../api/client';
+import { HlsVideo } from './PostCard';
 
 interface StoryItem {
   id: string;
@@ -97,7 +98,7 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
 
   const isVideo =
     currentStory.type === 'video' ||
-    /\.(webm|mp4|mov|m4v)(?:[?#].*)?$/i.test(storyMediaUrl);
+    /\.(webm|mp4|mov|m4v|m3u8)(?:[?#].*)?$/i.test(storyMediaUrl);
 
   const avatarSrc = getAvatarUrl({
     name: storyAuthorName,
@@ -108,6 +109,7 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
   return (
     <div
       onClick={onClose}
+      className="zq-story-viewer-overlay"
       style={{
         position: 'fixed',
         inset: 0,
@@ -125,6 +127,7 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
       {/* Main Story Card Frame */}
       <div
         onClick={(e) => e.stopPropagation()}
+        className="zq-story-viewer-frame"
         style={{
           position: 'relative',
           width: '100%',
@@ -157,6 +160,7 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
 
         {/* Top Header */}
         <div
+          className="zq-story-viewer-header"
           style={{
             position: 'absolute',
             top: 24,
@@ -227,13 +231,11 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
           <button aria-label="Previous story" onClick={goPrevious} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '35%', zIndex: 20, border: 0, background: 'transparent', cursor: 'pointer' }} />
           <button aria-label="Next story" onClick={goNext} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '65%', zIndex: 20, border: 0, background: 'transparent', cursor: 'pointer' }} />
           {isVideo ? (
-            <video
-              src={resolveMediaUrl(storyMediaUrl)}
-              autoPlay
-              loop
-              playsInline
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            />
+            /\.m3u8(?:[?#].*)?$/i.test(storyMediaUrl) ? (
+              <HlsVideo src={resolveMediaUrl(storyMediaUrl)} onError={() => {}} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            ) : (
+              <video src={resolveMediaUrl(storyMediaUrl)} autoPlay loop playsInline style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            )
           ) : (
             <img
               src={resolveMediaUrl(storyMediaUrl)}

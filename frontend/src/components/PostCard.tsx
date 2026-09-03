@@ -13,7 +13,7 @@ import {
   AuraSparkIcon,
 } from './Icons';
 
-export function HlsVideo({ src, onError }: { src: string; onError: () => void }) {
+export function HlsVideo({ src, onError, className, style }: { src: string; onError: () => void; className?: string; style?: React.CSSProperties }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export function HlsVideo({ src, onError }: { src: string; onError: () => void })
     return () => hls.destroy();
   }, [src, onError]);
 
-  return <video ref={videoRef} controls playsInline onError={onError} />;
+  return <video ref={videoRef} className={className} style={style} controls playsInline onError={onError} />;
 }
 
 export default function PostCard({ post }: { post: Post }) {

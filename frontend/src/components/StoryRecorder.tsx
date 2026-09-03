@@ -149,6 +149,7 @@ export default function StoryRecorder({ onSaved, onClose }: StoryRecorderProps) 
 
       await api.createStory({
         videoUrl: publicUrl,
+        visibility: 'PUBLIC',
       });
 
       if (onSaved) onSaved();

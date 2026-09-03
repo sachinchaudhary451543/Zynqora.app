@@ -1534,12 +1534,18 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .zq-moment-card img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #eaf2f6; }
 .zq-moment-card span { display: block; padding: 8px; overflow: hidden; color: var(--zq-text-primary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .zq-empty-state { color: var(--zq-text-secondary); font-size: 13px; }
+.zq-story-viewer-overlay { padding: 12px; overflow: hidden; }
+.zq-story-viewer-frame { width: min(420px, 100%); height: min(740px, calc(100dvh - 24px)); max-height: calc(100dvh - 24px); }
+.zq-story-viewer-header { min-height: 52px; }
 .zq-active-chat-name { color: var(--zq-text-primary); }
 .zq-active-chat-handle { color: var(--zq-accent-blue); }
 
 [data-theme='light'] .zq-story-username { color: var(--zq-text-primary) !important; }
 
 @media (max-width: 768px) {
+  .zq-story-viewer-overlay { align-items: center !important; justify-content: center !important; padding: 8px !important; }
+  .zq-story-viewer-frame { width: min(420px, 100%) !important; height: calc(100dvh - 16px) !important; max-height: calc(100dvh - 16px) !important; border-radius: 18px !important; }
+  .zq-story-viewer-header { top: 16px !important; left: 12px !important; right: 12px !important; }
   .zq-connections-modal-overlay { padding: 10px; }
   .zq-connections-modal { height: min(520px, calc(100dvh - 20px)) !important; max-height: calc(100dvh - 20px) !important; }
   .zq-connections-page { width: calc(100% - 20px); margin: 12px auto 76px; padding: 14px; border-radius: 14px; }
