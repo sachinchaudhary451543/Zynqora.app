@@ -22,4 +22,10 @@ export class ChatController {
   getMessages(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
     return this.chatService.getMessages(id, user.userId);
   }
+
+  @Post('conversation/:id/request/:status')
+  updateRequest(@CurrentUser() user: { userId: string }, @Param('id') id: string, @Param('status') status: 'ACCEPTED' | 'REJECTED') {
+    if (!['ACCEPTED', 'REJECTED'].includes(status)) throw new Error('Invalid request status');
+    return this.chatService.updateRequest(id, user.userId, status);
+  }
 }

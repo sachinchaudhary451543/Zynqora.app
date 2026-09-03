@@ -119,6 +119,8 @@ model Story {
 
 model Conversation {
   id        String   @id @default(uuid())
+  status    String   @default("PENDING")
+  requesterId String?
   createdAt DateTime @default(now())
   participants ConversationParticipant[]
   messages  Message[]

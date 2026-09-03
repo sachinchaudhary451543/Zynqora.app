@@ -5,6 +5,8 @@ import Suggestions from '../components/Suggestions';
 import StoryViewerModal from '../components/StoryViewerModal';
 import StoryRecorder from '../components/StoryRecorder';
 import { useAuth } from '../context/AuthContext';
+import LiveStreamModal from '../components/LiveStreamModal';
+import { createRealtimeSocket } from '../realtime';
 
 export default function Feed() {
   const { user } = useAuth();
@@ -19,6 +21,8 @@ export default function Feed() {
   const [activeStories, setActiveStories] = useState<any[]>([]);
   const [viewingStory, setViewingStory] = useState<any | null>(null);
   const [showStoryRecorder, setShowStoryRecorder] = useState(false);
+  const [liveRooms, setLiveRooms] = useState<any[]>([]);
+  const [liveViewing, setLiveViewing] = useState<any | null>(null);
 
   // Preset Community Circles (Qoras)
   const circles = [
@@ -108,7 +112,26 @@ export default function Feed() {
     return () => window.removeEventListener('ig-post-created', handleCreated);
   }, []);
 
+  useEffect(() => {
+    const socket = createRealtimeSocket();
+    socket.on('live:list', setLiveRooms);
+    socket.on('live:ended', ({ broadcasterId }) => setLiveRooms((rooms) => rooms.filter((room) => room.broadcasterId !== broadcasterId)));
+    return () => { socket.disconnect(); };
+  }, []);
+
+
   const storiesToShow = activeStories.length > 0 ? activeStories : sampleStories;
+  // Render one ring per author, while keeping every active story in that
+  // author's group for the viewer to play in sequence.
+  const storyGroups = Array.from(
+    (storiesToShow.reduce((groups, story) => {
+      const authorKey = story.author?.id || story.author?.username || story.title || story.authorName || story.id;
+      const group = groups.get(authorKey) || [];
+      group.push(story);
+      groups.set(authorKey, group);
+      return groups;
+    }, new Map<string, any[]>()) as Map<string, any[]>).values(),
+  );
   const userAvatar = getAvatarUrl(user);
 
   // Filter posts if circle is selected
@@ -135,6 +158,10 @@ export default function Feed() {
             </button>
           ))}
         </div>
+
+        {liveRooms.length > 0 && <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '8px 0 14px' }}>
+          {liveRooms.filter((room) => room.broadcasterId !== user?.id).map((room) => <button type="button" key={room.broadcasterId} className="zq-btn-glass" onClick={() => setLiveViewing({ room, broadcaster: false })}>🔴 {room.title}</button>)}
+        </div>}
 
         {/* Aura Stories Tray */}
         <div className="zq-aura-tray">
@@ -188,7 +215,8 @@ export default function Feed() {
           </div>
 
           {/* Stories */}
-          {storiesToShow.map((story) => {
+          {storyGroups.map((group, groupIndex) => {
+            const story = group[0];
             const storyAvatar = getAvatarUrl({
               name: story.author?.name || story.authorName,
               username: story.author?.username || story.title,
@@ -210,12 +238,9 @@ export default function Feed() {
                 className="zq-story-item"
                 onClick={() =>
                   setViewingStory({
-                    id: story.id,
-                    title: storyUsername,
-                    authorName: story.author?.name || story.authorName,
-                    authorAvatar: story.author?.profileImage || story.author?.avatarUrl || story.authorAvatar,
-                    mediaUrl,
-                    type: isVideo ? 'video' : 'image',
+                    groups: storyGroups,
+                    groupIndex,
+                    storyIndex: 0,
                   })
                 }
               >
@@ -295,6 +320,7 @@ export default function Feed() {
             onClose={() => setViewingStory(null)}
           />
         )}
+        {liveViewing && <LiveStreamModal room={liveViewing.room} broadcaster={false} onClose={() => setLiveViewing(null)} />}
 
         {/* Feed Posts Stream */}
         {loading && (

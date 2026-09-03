@@ -4,6 +4,7 @@ import { api, User, getAvatarUrl, getDefaultAvatar } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { MessagesIcon, SearchIcon } from '../components/Icons';
 import LiveCallModal from '../components/LiveCallModal';
+import { createRealtimeSocket } from '../realtime';
 
 export default function ChatPage() {
   const { username } = useParams<{ username?: string }>();
@@ -19,8 +20,44 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth <= 768);
-  const [activeCall, setActiveCall] = useState<{ peer: any; type: 'video' | 'audio' } | null>(null);
+  const [activeCall, setActiveCall] = useState<{ peer: any; type: 'video' | 'audio'; callId?: string; initiator?: boolean } | null>(null);
+  const [callHistory, setCallHistory] = useState<Array<{ type: string; direction: string; status: string; at: string }>>([]);
+  const [chatNotice, setChatNotice] = useState('');
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const recordCall = (entry: { type: string; direction: string; status: string }) => {
+    const key = `call-history:${user?.id || 'user'}:${activeUsername || 'unknown'}`;
+    const next = [{ ...entry, at: new Date().toISOString() }, ...callHistory].slice(0, 30);
+    setCallHistory(next);
+    localStorage.setItem(key, JSON.stringify(next));
+  };
+
+  useEffect(() => {
+    const key = `call-history:${user?.id || 'user'}:${activeUsername || 'unknown'}`;
+    try { setCallHistory(JSON.parse(localStorage.getItem(key) || '[]')); } catch { setCallHistory([]); }
+  }, [activeUsername, user?.id]);
+
+  useEffect(() => {
+    const socket = createRealtimeSocket();
+    socket.on('presence:online', ({ userId }: { userId: string }) => setOnlineUsers((current) => new Set(current).add(userId)));
+    socket.on('presence:offline', ({ userId }: { userId: string }) => setOnlineUsers((current) => { const next = new Set(current); next.delete(userId); return next; }));
+    socket.on('call:incoming', (call: { fromUserId: string; callId: string; callType: 'audio' | 'video' }) => {
+      const accepted = window.confirm(`Incoming ${call.callType} call. Accept?`);
+      if (accepted) {
+        recordCall({ type: call.callType, direction: 'Incoming', status: 'Accepted' });
+        setActiveCall({
+          peer: { id: call.fromUserId, username: 'Zynqora caller', name: 'Zynqora caller' },
+          type: call.callType,
+          callId: call.callId,
+          initiator: false,
+        });
+      } else {
+        recordCall({ type: call.callType, direction: 'Incoming', status: 'Missed' });
+        socket.emit('call:end', { targetUserId: call.fromUserId, callId: call.callId });
+      }
+    });
+    return () => { socket.disconnect(); };
+  }, [activeUsername, user?.id]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -54,6 +91,7 @@ export default function ChatPage() {
 
     const initConv = async () => {
       setLoading(true);
+      setChatNotice('');
       try {
         const c = await api.createConversation(activeUsername);
         setConv(c);
@@ -61,6 +99,9 @@ export default function ChatPage() {
         setMessages(ms || []);
       } catch (err) {
         console.error('Failed to init conversation', err);
+        const message = err instanceof Error ? err.message : 'This user has not followed you back yet. Chat is unavailable.';
+        setChatNotice(message.includes('mutual') || message.includes('followed you back') ? 'This user has not followed you back yet. You cannot send messages until you both follow each other.' : message);
+        setConv(null);
       } finally {
         setLoading(false);
       }
@@ -328,7 +369,7 @@ export default function ChatPage() {
                       <span style={{ fontSize: '11px', color: '#00dfd8' }}>⚡</span>
                     </div>
                     <div style={{ fontSize: '11px', color: '#00dfd8', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00dfd8', display: 'inline-block' }} />
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: activeUser?.id && onlineUsers.has(activeUser.id) ? '#00dfd8' : '#6b7280', display: 'inline-block' }} />
                       <span>Synced • @{activeUsername}</span>
                     </div>
                   </div>
@@ -339,7 +380,7 @@ export default function ChatPage() {
                   {/* Audio Call Button */}
                   <button
                     type="button"
-                    onClick={() => setActiveCall({ peer: activeUser || { username: activeUsername }, type: 'audio' })}
+                    onClick={() => { recordCall({ type: 'audio', direction: 'Outgoing', status: 'Calling' }); setActiveCall({ peer: activeUser || { username: activeUsername }, type: 'audio' }); }}
                     title="Start Audio Call"
                     style={{
                       padding: '7px 11px',
@@ -363,7 +404,7 @@ export default function ChatPage() {
                   {/* Video Call Button */}
                   <button
                     type="button"
-                    onClick={() => setActiveCall({ peer: activeUser || { username: activeUsername }, type: 'video' })}
+                    onClick={() => { recordCall({ type: 'video', direction: 'Outgoing', status: 'Calling' }); setActiveCall({ peer: activeUser || { username: activeUsername }, type: 'video' }); }}
                     title="Start Video Call"
                     style={{
                       padding: '7px 11px',
@@ -405,6 +446,9 @@ export default function ChatPage() {
                 </div>
               </div>
 
+              {chatNotice && <div style={{ margin: '10px 16px 0', padding: '11px 14px', borderRadius: 12, color: '#ffd1dc', background: 'rgba(255,51,102,.12)', border: '1px solid rgba(255,51,102,.3)', fontSize: 12 }}>{chatNotice}</div>}
+              {conv?.status === 'PENDING' && conv.requesterId !== user?.id && <div style={{ margin: '10px 16px 0', padding: 12, borderRadius: 12, color: '#e9e7ff', background: 'rgba(121,40,202,.16)', border: '1px solid rgba(121,40,202,.35)', fontSize: 12 }}>Message request received. Review it before continuing.<div style={{ marginTop: 8, display: 'flex', gap: 8 }}><button type="button" className="zq-btn-aura" onClick={async () => setConv(await api.updateChatRequest(conv.id, 'ACCEPTED'))}>Accept</button><button type="button" className="zq-btn-glass" onClick={async () => setConv(await api.updateChatRequest(conv.id, 'REJECTED'))}>Reject</button></div></div>}
+              {conv?.status === 'PENDING' && conv.requesterId === user?.id && <div style={{ margin: '10px 16px 0', padding: 11, borderRadius: 12, color: '#cbd2e6', background: 'rgba(255,255,255,.06)', fontSize: 12 }}>Message request sent. This user has not followed you back yet; wait for their review.</div>}
               {/* Messages Scroll Area */}
               <div
                 style={{
@@ -416,6 +460,7 @@ export default function ChatPage() {
                   gap: '12px',
                 }}
               >
+                {callHistory.map((call, index) => <div key={`${call.at}-${index}`} style={{ alignSelf: 'center', color: call.status === 'Missed' ? '#ff6688' : '#9ca3af', fontSize: 12, padding: '8px 14px', borderRadius: 12, background: 'rgba(255,255,255,.05)' }}>{call.status === 'Missed' ? '↘ Missed' : call.direction} {call.type} call · {new Date(call.at).toLocaleString()}</div>)}
                 {loading ? (
                   <div style={{ textAlign: 'center', margin: 'auto', color: '#8892b0' }}>
                     <span className="zq-pulse-orb" style={{ display: 'inline-block', marginRight: '8px' }} />
@@ -536,6 +581,9 @@ export default function ChatPage() {
                 }}
               >
                 {/* Quick Emojis */}
+                <div style={{ display: 'flex', gap: 3 }} aria-label="Stickers">
+                  {['👋', '✨', '🔥', '❤️', '😂', '🎉', '🚀'].map((sticker) => <button key={sticker} type="button" onClick={() => setText((value) => value + sticker)} style={{ background: 'rgba(255,255,255,.05)', border: 0, borderRadius: 8, padding: 6, cursor: 'pointer' }}>{sticker}</button>)}
+                </div>
                 <div style={{ display: 'flex', gap: '3px' }}>
                   {['⚡', '🔥'].map((em) => (
                     <button
@@ -575,7 +623,7 @@ export default function ChatPage() {
 
                 <button
                   type="submit"
-                  disabled={!text.trim()}
+                  disabled={!text.trim() || !conv?.id}
                   style={{
                     padding: '10px 18px',
                     borderRadius: '22px',
@@ -614,7 +662,9 @@ export default function ChatPage() {
         <LiveCallModal
           peer={activeCall.peer}
           callType={activeCall.type}
-          onEndCall={() => setActiveCall(null)}
+          callId={activeCall.callId}
+          initiator={activeCall.initiator}
+          onEndCall={() => { recordCall({ type: activeCall.type, direction: activeCall.initiator === false ? 'Incoming' : 'Outgoing', status: 'Ended' }); setActiveCall(null); }}
         />
       )}
     </div>

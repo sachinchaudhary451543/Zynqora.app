@@ -10,10 +10,15 @@ interface StoryItem {
   authorName?: string;
   authorAvatar?: string;
   vibe?: string;
+  caption?: string;
+  createdAt?: string;
+  videoUrl?: string;
+  thumbnail?: string;
+  author?: { name?: string; username?: string; profileImage?: string; avatarUrl?: string };
 }
 
 interface StoryViewerModalProps {
-  story: StoryItem | null;
+  story: { groups: StoryItem[][]; groupIndex: number; storyIndex: number } | null;
   onClose: () => void;
 }
 
@@ -21,15 +26,53 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
   const [progress, setProgress] = useState(0);
   const [liked, setLiked] = useState(false);
   const [sparkEffect, setSparkEffect] = useState(false);
+  const [groupIndex, setGroupIndex] = useState(0);
+  const [storyIndex, setStoryIndex] = useState(0);
+
+  const currentGroup = story?.groups[groupIndex] || [];
+  const currentStory = currentGroup[storyIndex] || null;
 
   useEffect(() => {
     if (!story) return;
+    setGroupIndex(story.groupIndex);
+    setStoryIndex(story.storyIndex);
     setProgress(0);
+    setLiked(false);
+  }, [story]);
+
+  const goNext = () => {
+    if (!story) return;
+    if (storyIndex < currentGroup.length - 1) {
+      setStoryIndex((index) => index + 1);
+    } else if (groupIndex < story.groups.length - 1) {
+      setGroupIndex((index) => index + 1);
+      setStoryIndex(0);
+    } else {
+      onClose();
+      return;
+    }
+    setProgress(0);
+  };
+
+  const goPrevious = () => {
+    if (!story) return;
+    if (storyIndex > 0) {
+      setStoryIndex((index) => index - 1);
+    } else if (groupIndex > 0) {
+      const previousGroup = story.groups[groupIndex - 1];
+      setGroupIndex((index) => index - 1);
+      setStoryIndex(Math.max(previousGroup.length - 1, 0));
+    }
+    setProgress(0);
+  };
+
+  useEffect(() => {
+    if (!story || !currentStory) return;
     const interval = setInterval(() => {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
-          onClose();
+          goNext();
           return 100;
         }
         return prev + 1.2;
@@ -37,9 +80,14 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
     }, 100);
 
     return () => clearInterval(interval);
-  }, [story]);
+  }, [story, groupIndex, storyIndex, currentStory]);
 
-  if (!story) return null;
+  if (!story || !currentStory) return null;
+
+  const storyMediaUrl = currentStory.mediaUrl || currentStory.videoUrl || currentStory.thumbnail || '';
+  const storyTitle = currentStory.title || currentStory.author?.username || 'Aura';
+  const storyAuthorName = currentStory.authorName || currentStory.author?.name || storyTitle;
+  const storyAvatar = currentStory.authorAvatar || currentStory.author?.profileImage || currentStory.author?.avatarUrl;
 
   const handleSpark = (emoji: string) => {
     setLiked(true);
@@ -48,14 +96,13 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
   };
 
   const isVideo =
-    story.type === 'video' ||
-    story.mediaUrl?.endsWith('.webm') ||
-    story.mediaUrl?.endsWith('.mp4');
+    currentStory.type === 'video' ||
+    /\.(webm|mp4|mov|m4v)(?:[?#].*)?$/i.test(storyMediaUrl);
 
   const avatarSrc = getAvatarUrl({
-    name: story.authorName,
-    username: story.title,
-    avatarUrl: story.authorAvatar,
+    name: storyAuthorName,
+    username: storyTitle,
+    avatarUrl: storyAvatar,
   });
 
   return (
@@ -95,17 +142,17 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
       >
         {/* Story Progress Bar */}
         <div style={{ position: 'absolute', top: 12, left: 14, right: 14, zIndex: 30, display: 'flex', gap: 4 }}>
-          <div style={{ flex: 1, height: 3.5, background: 'rgba(255, 255, 255, 0.3)', borderRadius: 4, overflow: 'hidden' }}>
+          {currentGroup.map((_, index) => <div key={index} style={{ flex: 1, height: 3.5, background: 'rgba(255, 255, 255, 0.3)', borderRadius: 4, overflow: 'hidden' }}>
             <div
               style={{
-                width: `${progress}%`,
+                width: `${index < storyIndex ? 100 : index === storyIndex ? progress : 0}%`,
                 height: '100%',
                 background: 'linear-gradient(90deg, #00dfd8, #7928ca)',
                 boxShadow: '0 0 8px #00dfd8',
                 transition: 'width 0.1s linear',
               }}
             />
-          </div>
+          </div>)}
         </div>
 
         {/* Top Header */}
@@ -136,21 +183,21 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
             >
               <img
                 src={avatarSrc}
-                alt={story.title}
+                alt={storyTitle}
                 style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.onerror = null;
-                  target.src = getDefaultAvatar(story.authorName || story.title);
+                  target.src = getDefaultAvatar(storyAuthorName || storyTitle);
                 }}
               />
             </div>
             <div>
               <div style={{ fontWeight: 800, fontSize: '14px', color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-                {story.authorName || story.title}
+                {storyAuthorName}
               </div>
               <div style={{ fontSize: '11px', color: '#00dfd8', fontWeight: 600 }}>
-                {story.vibe || '⚡ Active Aura Moment'}
+                {currentStory.createdAt ? `Posted ${new Date(currentStory.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}` : (currentStory.vibe || '⚡ Active Aura Moment')}
               </div>
             </div>
           </div>
@@ -177,9 +224,11 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
 
         {/* Story Media Viewer */}
         <div style={{ flex: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
+          <button aria-label="Previous story" onClick={goPrevious} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '35%', zIndex: 20, border: 0, background: 'transparent', cursor: 'pointer' }} />
+          <button aria-label="Next story" onClick={goNext} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '65%', zIndex: 20, border: 0, background: 'transparent', cursor: 'pointer' }} />
           {isVideo ? (
             <video
-              src={resolveMediaUrl(story.mediaUrl)}
+              src={resolveMediaUrl(storyMediaUrl)}
               autoPlay
               loop
               playsInline
@@ -187,11 +236,13 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
             />
           ) : (
             <img
-              src={resolveMediaUrl(story.mediaUrl)}
-              alt={story.title}
+              src={resolveMediaUrl(storyMediaUrl)}
+              alt={storyTitle}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           )}
+
+          {currentStory.caption && <div style={{ position: 'absolute', left: 20, right: 20, bottom: 80, zIndex: 25, color: '#fff', textAlign: 'center', textShadow: '0 1px 4px #000' }}>{currentStory.caption}</div>}
 
           {/* Spark Particle Animation Effect */}
           {sparkEffect && (

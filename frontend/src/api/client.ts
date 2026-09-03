@@ -221,6 +221,7 @@ export const api = {
   postMessage: (conversationId: string, content: string) =>
     request(`/chat/conversation/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ content }) }),
   getMessages: (conversationId: string) => request<any[]>(`/chat/conversation/${conversationId}/messages`),
+  updateChatRequest: (conversationId: string, status: 'ACCEPTED' | 'REJECTED') => request<any>(`/chat/conversation/${conversationId}/request/${status}`, { method: 'POST' }),
   // Uploads / presign
   presignUpload: (filename: string, contentType: string) =>
     request<any>('/uploads/presign', { method: 'POST', body: JSON.stringify({ filename, contentType }) }),

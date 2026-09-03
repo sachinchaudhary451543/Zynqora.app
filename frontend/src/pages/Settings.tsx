@@ -31,6 +31,14 @@ export default function SettingsPage() {
   const [category, setCategory] = useState(user?.category || 'Education • AI Creator');
   const [vibeNote, setVibeNote] = useState(user?.note || '⚡ In the Zone');
   const [showAuraBadge, setShowAuraBadge] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('zynqora-theme') === 'dark');
+
+  const toggleTheme = () => {
+    const next = !darkMode;
+    setDarkMode(next);
+    localStorage.setItem('zynqora-theme', next ? 'dark' : 'light');
+    document.documentElement.dataset.theme = next ? 'dark' : 'light';
+  };
 
   const [privacy, setPrivacy] = useState({
     profileVisibility: user?.profileVisibility || 'PUBLIC',
@@ -194,6 +202,10 @@ export default function SettingsPage() {
         <h2 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '24px', color: '#fff' }}>
           {activeTab === 'aura-profile' ? 'Aura & Identity Settings' : 'Circle & Privacy Parameters'}
         </h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', marginBottom: 20, borderRadius: 16, background: 'var(--zq-glass)', border: '1px solid var(--zq-glass-border)', boxShadow: 'inset 1px 1px rgba(255,255,255,.18), 0 10px 24px rgba(0,80,120,.12)' }}>
+          <div><strong style={{ color: 'var(--zq-text-primary)' }}>Appearance</strong><div style={{ color: 'var(--zq-text-secondary)', fontSize: 12 }}>Light glass is the default. Dark mode is only for your device.</div></div>
+          <button type="button" onClick={toggleTheme} aria-pressed={darkMode} className="zq-btn-glass">{darkMode ? '☀ Light mode' : '🌙 Dark mode'}</button>
+        </div>
 
         {successMsg && (
           <div style={{ padding: '12px 18px', background: 'rgba(0, 223, 216, 0.15)', border: '1px solid rgba(0, 223, 216, 0.4)', color: 'var(--zq-accent-cyan)', borderRadius: '12px', marginBottom: '24px', fontWeight: 600 }}>

@@ -1,6 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { isMutualFollow } from '../common/social-access';
 
 @Injectable()
 export class ChatService {
@@ -10,9 +9,6 @@ export class ChatService {
     const userB = await this.prisma.user.findUnique({ where: { username: userBUsername }, select: { id: true } });
     if (!userB) throw new NotFoundException('User not found');
     if (userAId === userB.id) throw new ForbiddenException('Cannot create a conversation with yourself');
-    if (!(await isMutualFollow(this.prisma, userAId, userB.id))) {
-      throw new ForbiddenException('Chat is available only between mutual followers');
-    }
 
     const existing = await (this.prisma as any).conversation.findFirst({
       where: {
@@ -27,14 +23,26 @@ export class ChatService {
 
     return (this.prisma as any).conversation.create({
       data: {
+        status: 'PENDING',
+        requesterId: userAId,
         participants: { create: [{ userId: userAId }, { userId: userB.id }] },
       },
       include: { participants: true },
     });
   }
 
+  async updateRequest(conversationId: string, userId: string, status: 'ACCEPTED' | 'REJECTED') {
+    const conversation = await (this.prisma as any).conversation.findUnique({ where: { id: conversationId }, include: { participants: true } });
+    if (!conversation || !conversation.participants.some((participant: any) => participant.userId === userId)) throw new ForbiddenException('Conversation access denied');
+    if (conversation.status !== 'PENDING') return conversation;
+    if (status === 'REJECTED' && conversation.requesterId === userId) throw new ForbiddenException('The sender cannot reject their own request');
+    return (this.prisma as any).conversation.update({ where: { id: conversationId }, data: { status } });
+  }
+
   async postMessage(conversationId: string, senderId: string, content: string) {
     await this.ensureParticipant(conversationId, senderId);
+    const conversation = await (this.prisma as any).conversation.findUnique({ where: { id: conversationId }, select: { status: true } });
+    if (conversation?.status === 'REJECTED') throw new ForbiddenException('This chat request was rejected. You may request again later.');
     const text = (content || '').trim();
     if (!text) throw new ForbiddenException('Message cannot be empty');
     return (this.prisma as any).message.create({ data: { conversationId, senderId, content: text } });

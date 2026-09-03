@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, getAvatarUrl, getDefaultAvatar } from '../api/client';
 import { AuraSparkIcon } from './Icons';
+import { createRealtimeSocket } from '../realtime';
 
 interface LiveCallModalProps {
   peer: User | { username: string; name?: string; avatarUrl?: string | null; profileImage?: string | null };
   callType: 'video' | 'audio';
   onEndCall: () => void;
+  callId?: string;
+  initiator?: boolean;
 }
 
-export default function LiveCallModal({ peer, callType, onEndCall }: LiveCallModalProps) {
+export default function LiveCallModal({ peer, callType, onEndCall, callId, initiator = true }: LiveCallModalProps) {
   const [callStatus, setCallStatus] = useState<'connecting' | 'connected' | 'ended'>('connecting');
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
@@ -17,6 +20,12 @@ export default function LiveCallModal({ peer, callType, onEndCall }: LiveCallMod
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const socketRef = useRef<ReturnType<typeof createRealtimeSocket> | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const callSessionIdRef = useRef(callId || crypto.randomUUID());
+  const callSessionId = callSessionIdRef.current;
+  const targetUserId = (peer as User).id;
 
   // Initialize camera / mic stream
   useEffect(() => {
@@ -25,8 +34,8 @@ export default function LiveCallModal({ peer, callType, onEndCall }: LiveCallMod
     async function initMedia() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: callType === 'video',
-          audio: true,
+          video: callType === 'video' ? { width: { ideal: 1280, max: 1280 }, height: { ideal: 720, max: 720 }, frameRate: { ideal: 24, max: 30 } } : false,
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
         });
         if (!active) {
           stream.getTracks().forEach((t) => t.stop());
@@ -36,8 +45,48 @@ export default function LiveCallModal({ peer, callType, onEndCall }: LiveCallMod
         if (localVideoRef.current && callType === 'video') {
           localVideoRef.current.srcObject = stream;
         }
+
+        if (!targetUserId) throw new Error('The selected user cannot receive calls');
+        const socket = createRealtimeSocket();
+        socketRef.current = socket;
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        });
+        peerConnectionRef.current = pc;
+        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+        pc.ontrack = (event) => {
+          const [remoteStream] = event.streams;
+          if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
+        };
+        pc.onicecandidate = (event) => {
+          if (event.candidate) socket.emit('call:signal', { targetUserId, callId: callSessionId, signal: { candidate: event.candidate } });
+        };
+        socket.on('call:signal', async ({ signal, fromUserId }) => {
+          if (fromUserId !== targetUserId) return;
+          if (signal?.candidate) await pc.addIceCandidate(signal.candidate);
+          if (signal?.description) {
+            await pc.setRemoteDescription(signal.description);
+            if (signal.description.type === 'offer') {
+              const answer = await pc.createAnswer();
+              await pc.setLocalDescription(answer);
+              socket.emit('call:signal', { targetUserId, callId: callSessionId, signal: { description: answer } });
+              setCallStatus('connected');
+            }
+          }
+        });
+        socket.on('call:ended', onEndCall);
+        socket.on('connect', async () => {
+          if (!initiator) socket.emit('call:join', { callId: callSessionId, targetUserId });
+          if (initiator) socket.emit('call:invite', { targetUserId, callId: callSessionId, callType });
+          if (initiator) {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socket.emit('call:signal', { targetUserId, callId: callSessionId, signal: { description: offer } });
+          }
+        });
       } catch (err) {
         console.warn('Could not access media devices:', err);
+        setCallStatus('ended');
       }
     }
 
@@ -54,8 +103,11 @@ export default function LiveCallModal({ peer, callType, onEndCall }: LiveCallMod
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
+      peerConnectionRef.current?.close();
+      socketRef.current?.emit('call:end', { targetUserId, callId: callSessionId });
+      socketRef.current?.disconnect();
     };
-  }, [callType]);
+  }, [callType, callId, initiator, targetUserId, onEndCall]);
 
   // Duration timer
   useEffect(() => {
@@ -306,6 +358,7 @@ export default function LiveCallModal({ peer, callType, onEndCall }: LiveCallMod
                   Camera Off
                 </div>
               )}
+              <video ref={remoteVideoRef} autoPlay playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#080912' }} />
               <div style={{ position: 'absolute', bottom: '4px', left: '6px', fontSize: '9px', fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,0.6)', padding: '1px 5px', borderRadius: '6px' }}>
                 You
               </div>

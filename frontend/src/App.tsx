@@ -6,6 +6,7 @@ import Signup from './pages/Signup';
 import Feed from './pages/Feed';
 import Profile from './pages/Profile';
 import Explore from './pages/Explore';
+import CirclesHub from './pages/CirclesHub';
 import SettingsPage from './pages/Settings';
 import ChatPage from './pages/Chat';
 import FollowersPage from './pages/Followers';
@@ -26,6 +27,10 @@ export default function App() {
   const location = useLocation();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState(() => localStorage.getItem('pendingRecoveryCode') || '');
+
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = localStorage.getItem('zynqora-theme') === 'dark' ? 'dark' : 'light';
+  }, []);
 
   React.useEffect(() => {
     const refresh = () => setRecoveryCode(localStorage.getItem('pendingRecoveryCode') || '');
@@ -61,6 +66,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Explore />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/circles"
+            element={
+              <ProtectedRoute>
+                <CirclesHub />
               </ProtectedRoute>
             }
           />

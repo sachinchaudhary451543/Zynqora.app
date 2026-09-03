@@ -79,15 +79,15 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             className="zq-sparks-btn"
             onClick={() => setShowNotifications(!showNotifications)}
             style={{
-              background: 'rgba(255, 255, 255, 0.06)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
+              background: '#ffffff',
+              border: '1px solid #bfd0dc',
               borderRadius: '50%',
               width: '36px',
               height: '36px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#fff',
+              color: 'var(--zq-text-primary)',
               position: 'relative',
               cursor: 'pointer',
             }}
@@ -177,12 +177,12 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             </NavLink>
 
             <NavLink
-              to="/explore"
+              to="/circles"
               className={({ isActive }) => `zq-nav-item ${isActive ? 'active' : ''}`}
               title="Community Circles (Qoras)"
             >
               <div className="zq-nav-icon-container">
-                <CirclesIcon size={22} active={location.pathname === '/explore'} />
+                <CirclesIcon size={22} active={location.pathname === '/circles'} />
               </div>
               <span className="zq-nav-label">Circles Hub</span>
             </NavLink>
@@ -323,6 +323,9 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             <span className="zq-nav-label">More</span>
           </button>
 
+          <div style={{ marginTop: 12, padding: 8, borderRadius: 14, background: 'rgba(86,214,255,.08)', border: '1px solid rgba(86,214,255,.22)' }} title="Created by CodeWithSP">
+            <img src="/creator.svg" alt="CodeWithSP creator" style={{ width: '100%', display: 'block', borderRadius: 9 }} />
+          </div>
           <div className="zq-core-badge">
             <span>✦ ZYNQORA CORE</span>
           </div>

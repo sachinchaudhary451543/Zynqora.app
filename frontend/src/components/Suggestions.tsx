@@ -68,7 +68,7 @@ export default function Suggestions() {
               </Link>
               <div>
                 <Link to={`/profile/${user.username}`}>
-                  <h4 style={{ fontSize: '15px', fontWeight: 800, color: '#fff' }}>{user.username}</h4>
+                  <h4 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--zq-text-primary)' }}>{user.username}</h4>
                 </Link>
                 <p style={{ fontSize: '12px', color: 'var(--zq-accent-cyan)' }}>{user.note || '⚡ In the Zone'}</p>
               </div>
@@ -88,7 +88,7 @@ export default function Suggestions() {
       {/* Suggested Circles & Members */}
       <div className="zq-profile-card-widget">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-          <span style={{ fontSize: '13px', fontWeight: 800, color: '#fff', letterSpacing: '0.5px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--zq-text-primary)', letterSpacing: '0.5px' }}>
             RECOMMENDED AURAS
           </span>
           <Link to="/explore" style={{ fontSize: '11px', fontWeight: 700, color: 'var(--zq-accent-cyan)' }}>
@@ -123,7 +123,7 @@ export default function Suggestions() {
                     </Link>
                     <div>
                       <Link to={`/profile/${s.username}`}>
-                        <div style={{ fontWeight: 700, fontSize: '13px', color: '#fff' }}>{s.username}</div>
+                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--zq-text-primary)' }}>{s.username}</div>
                       </Link>
                       <div style={{ fontSize: '11px', color: 'var(--zq-text-muted)' }}>
                         Aligned with your circles

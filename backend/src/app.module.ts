@@ -11,6 +11,7 @@ import { StoriesModule } from './stories/stories.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { ChatModule } from './chat/chat.module';
 import { HealthController } from './health.controller';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { HealthController } from './health.controller';
     StoriesModule,
     UploadsModule,
     ChatModule,
+    RealtimeModule,
   ],
   controllers: [HealthController],
 })

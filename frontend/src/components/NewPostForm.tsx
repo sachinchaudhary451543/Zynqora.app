@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import LiveStreamModal from './LiveStreamModal';
 
 export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
   const [content, setContent] = useState('');
@@ -8,6 +10,8 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showLive, setShowLive] = useState(false);
+  const { user } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +50,9 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
       <h3 style={{ margin: '0 0 16px 0', color: '#1a1a1a', fontSize: '18px', fontWeight: '600' }}>
         ✨ What's on your mind?
       </h3>
+      <button type="button" className="zq-btn-glass" onClick={() => setShowLive(true)} style={{ marginBottom: 16, borderColor: '#ff3366', color: '#ff6688' }}>
+        Start Live Sync
+      </button>
       <div className="form-field">
         <textarea
           placeholder="Share a photo, video, or thought with your family and friends..."
@@ -98,6 +105,7 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
       <button type="submit" disabled={loading || (!content.trim() && !mediaUrl.trim() && !mediaFile)}>
         {loading ? '⏳ Posting...' : '📤 Post'}
       </button>
+      {showLive && user?.id && <LiveStreamModal room={{ broadcasterId: user.id, title: 'Live Sync', startedAt: new Date().toISOString() }} broadcaster onClose={() => setShowLive(false)} />}
     </form>
   );
 }

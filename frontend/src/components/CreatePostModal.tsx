@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import LiveStreamModal from './LiveStreamModal';
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -16,9 +18,15 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
   const [visibility, setVisibility] = useState<'TREE' | 'FOLLOWERS' | 'CIRCLE'>('FOLLOWERS');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showLive, setShowLive] = useState(false);
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!isOpen) return null;
+
+  if (showLive && user?.id) {
+    return <LiveStreamModal room={{ broadcasterId: user.id, title: 'Live Sync', startedAt: new Date().toISOString() }} broadcaster onClose={() => setShowLive(false)} />;
+  }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -99,6 +107,10 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
 
         <form onSubmit={handleSubmit} style={{ padding: '24px' }}>
           {/* Target Circle Selector */}
+          <button type="button" className="zq-btn-glass" onClick={() => setShowLive(true)} style={{ marginBottom: '18px', borderColor: '#ff3366', color: '#ff6688' }}>
+            🔴 Start Live Sync
+          </button>
+
           <div style={{ marginBottom: '18px' }}>
             <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--zq-text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
               Publish Target Circle (Qora)

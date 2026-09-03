@@ -125,10 +125,11 @@ export const MessagesIcon: React.FC<IconProps> = ({ size = 24, active = false, .
   </svg>
 );
 
-// Aura Notifications (Heart/Spark)
+// Aura Notifications
 export const NotificationsIcon: React.FC<IconProps> = ({ size = 24, active = false, ...props }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? '2.2' : '2'} strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+    <path d="M10 21h4" />
   </svg>
 );
 
@@ -185,7 +186,7 @@ export const BookmarkIcon: React.FC<IconProps> = ({ size = 18, active = false, .
 );
 
 // Tagged / Aura Network Icon
-export const TaggedIcon: React.FC<IconProps> = ({ size = 18, ...props }) => (
+export const TaggedIcon: React.FC<IconProps> = ({ size = 18, active: _active, ...props }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
     <line x1="7" y1="7" x2="7.01" y2="7" strokeWidth="3" />
