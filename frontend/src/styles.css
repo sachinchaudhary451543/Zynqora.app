@@ -1513,6 +1513,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 }
 
 .zq-route-loading { min-height: 40vh; display: grid; place-items: center; color: var(--zq-text-secondary); font-size: 13px; }
+.zq-connections-page { width: min(100% - 32px, 680px); margin: 32px auto 80px; padding: 24px; background: #fff; border: 1px solid var(--zq-glass-border); border-radius: 18px; box-shadow: 0 20px 48px rgba(43, 77, 99, .16); }
+.zq-connections-heading { margin-bottom: 20px; }
+.zq-connections-heading > span { color: var(--zq-accent-blue); font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+.zq-connections-heading h1 { margin: 5px 0 2px; color: var(--zq-text-primary); font-size: 24px; }
+.zq-connections-heading p, .zq-connections-muted { color: var(--zq-text-secondary); font-size: 13px; }
+.zq-connection-card { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 68px; padding: 10px 12px; margin-top: 8px; border: 1px solid #d2e0e8; border-radius: 12px; background: #f7fbfd; color: var(--zq-text-primary); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.zq-connection-card:hover { transform: translateY(-2px); border-color: var(--zq-glass-border-hover); box-shadow: 0 8px 18px rgba(43, 121, 156, .13); }
+.zq-connection-card img { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 50%; object-fit: cover; }
+.zq-connection-card div { min-width: 0; flex: 1; }
+.zq-connection-card strong, .zq-connection-card span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zq-connection-card strong { color: var(--zq-text-primary); font-size: 14px; }
+.zq-connection-card div span { margin-top: 2px; color: var(--zq-text-secondary); font-size: 12px; }
+.zq-connection-arrow { color: var(--zq-accent-blue); font-size: 11px; font-weight: 700; }
+.zq-connections-error { padding: 14px; border-radius: 10px; color: #b42345; background: #fff1f3; border: 1px solid #f4b8c5; font-size: 13px; }
 .zq-moments-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
 .zq-moment-card { min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--zq-glass-border); border-radius: 12px; background: #fff; color: var(--zq-text-primary); text-align: left; cursor: pointer; }
 .zq-moment-card img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #eaf2f6; }
@@ -1522,6 +1536,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 [data-theme='light'] .zq-story-username { color: var(--zq-text-primary) !important; }
 
 @media (max-width: 768px) {
+  .zq-connections-page { width: calc(100% - 20px); margin: 12px auto 76px; padding: 14px; border-radius: 14px; }
+  .zq-connections-heading h1 { font-size: 20px; }
   .zq-chat-shell { height: calc(100dvh - 118px) !important; min-height: 0 !important; max-height: calc(100dvh - 118px) !important; overflow: hidden !important; }
   .zq-chat-sidebar-panel, .zq-chat-area { min-height: 0 !important; }
   .zq-chat-header { flex: 0 0 auto !important; min-height: 58px !important; padding: 8px 10px !important; background: #fff !important; border-bottom-color: #bfd0dc !important; }

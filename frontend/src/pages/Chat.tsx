@@ -69,6 +69,10 @@ export default function ChatPage() {
     api.getSuggestions()
       .then((data) => {
         setConversations(data);
+        if (activeUsername) {
+          const selected = data.find((conversation) => conversation.username === activeUsername);
+          if (selected) setActiveUser(selected);
+        }
         if (!username && data.length > 0 && !isMobile) {
           setActiveUsername(data[0].username);
         }
@@ -251,6 +255,7 @@ export default function ChatPage() {
                       transition: 'all 0.15s ease',
                     }}
                     onClick={() => {
+                      setActiveUser(cUser);
                       setActiveUsername(cUser.username);
                       navigate(`/chat/${cUser.username}`);
                     }}
