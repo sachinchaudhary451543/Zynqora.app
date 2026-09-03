@@ -1534,6 +1534,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .zq-moment-card img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #eaf2f6; }
 .zq-moment-card span { display: block; padding: 8px; overflow: hidden; color: var(--zq-text-primary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .zq-empty-state { color: var(--zq-text-secondary); font-size: 13px; }
+.zq-notification-empty { padding: 32px 16px; color: var(--zq-text-secondary); font-size: 13px; text-align: center; }
 .zq-story-viewer-overlay { padding: 12px; overflow: hidden; }
 .zq-story-viewer-frame { width: min(420px, 100%); height: min(740px, calc(100dvh - 24px)); max-height: calc(100dvh - 24px); }
 .zq-story-viewer-header { min-height: 52px; }
@@ -1568,6 +1569,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .zq-chat-header [style*='#00dfd8'] { color: #087c9c !important; }
   .zq-chat-sidebar-panel [style*='color: #fff'] { color: var(--zq-text-primary) !important; }
 }
+
+/* Chat surface: one readable theme and one contained viewport on every device. */
+.zq-chat-shell { background: #ffffff !important; border-color: #bfd0dc !important; color: var(--zq-text-primary); }
+.zq-chat-sidebar-panel { background: #f7fbfd !important; border-color: #bfd0dc !important; }
+.zq-chat-area { background: #ffffff !important; }
+.zq-chat-sidebar-panel > div:first-child { background: #ffffff !important; border-color: #d2e0e8 !important; }
+.zq-chat-sidebar-panel > div:first-child span[style*='color: #fff'],
+.zq-chat-header [style*='color: #fff'] { color: var(--zq-text-primary) !important; }
+.zq-chat-sidebar-panel input,
+.zq-chat-composer input { background: #f4f8fb !important; border-color: #bfd0dc !important; color: var(--zq-text-primary) !important; }
+.zq-chat-sidebar-panel input::placeholder,
+.zq-chat-composer input::placeholder { color: #668395 !important; }
+.zq-chat-header { background: #ffffff !important; border-color: #bfd0dc !important; color: var(--zq-text-primary); }
+.zq-chat-header button[title='Start Audio Call'], .zq-chat-header button[title='Start Video Call'] { min-width: 72px; }
+.zq-chat-composer { background: #ffffff !important; border-color: #bfd0dc !important; }
+.zq-chat-composer > div:first-child { overflow-x: auto; scrollbar-width: none; }
+.zq-chat-composer > div:first-child::-webkit-scrollbar { display: none; }
+.zq-chat-user-name, .zq-active-chat-name { color: var(--zq-text-primary) !important; }
+.zq-chat-user-handle, .zq-active-chat-handle { color: #087c9c !important; }
+
+[data-theme='light'] .zq-sparks-btn { color: #087c9c !important; }
+[data-theme='light'] .zq-sparks-btn + * { color: var(--zq-text-primary); }
 
 /* Final light-theme overrides for shared feature surfaces. */
 [data-theme='light'] .zq-chat-page-wrap { background: #ffffff !important; border-color: #bfd0dc !important; box-shadow: 0 24px 64px rgba(27,111,145,.2) !important; }

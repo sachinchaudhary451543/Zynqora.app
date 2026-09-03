@@ -51,7 +51,10 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
   }, []);
 
   useEffect(() => {
-    api.getNotifications().then(setNotifications).catch(() => setNotifications([]));
+    const loadNotifications = () => api.getNotifications().then(setNotifications).catch(() => setNotifications([]));
+    loadNotifications();
+    const interval = window.setInterval(loadNotifications, 15000);
+    return () => window.clearInterval(interval);
   }, []);
 
   const handleLogout = () => {
@@ -60,14 +63,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
   };
 
   const userAvatar = getAvatarUrl(user);
-
-  const mockSparks = [
-    { id: 1, type: 'spark', user: 'sarahsmith2026', name: 'Sarah Smith', action: 'sent you a ⚡ High-Resonance Spark', time: '2m ago' },
-    { id: 2, type: 'circle', user: 'emma_watson', name: 'Emma', action: 'invited you to 🚀 AI Pioneers Circle', time: '18m ago' },
-    { id: 3, type: 'comment', user: 'john_doe', name: 'John', action: 'synced on your recent update: "Brilliant tech!"', time: '1h ago' },
-    { id: 4, type: 'follow', user: 'alex_rivera', name: 'Alex Rivera', action: 'synchronized into your Aura Circle', time: '3h ago' },
-    { id: 5, type: 'reaction', user: 'tech_guru', name: 'Elena', action: 'reacted with 🔥 to your Code Sync', time: '5h ago' },
-  ];
+  const visibleUnreadCount = notifications.filter((notification) => !notification.read).length;
 
   return (
     <>
@@ -137,7 +133,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
         >
           <div style={{ position: 'relative' }}>
             <MessagesIcon size={22} active={location.pathname.startsWith('/chat')} />
-            {unreadCount > 0 && <span className="zq-badge-count" style={{ top: '-4px', right: '-8px' }}>{unreadCount}</span>}
+            {visibleUnreadCount > 0 && <span className="zq-badge-count" style={{ top: '-4px', right: '-8px' }}>{visibleUnreadCount}</span>}
           </div>
           <span>Sync Chat</span>
         </NavLink>
@@ -210,7 +206,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             >
               <div className="zq-nav-icon-container">
                 <MessagesIcon size={22} active={location.pathname.startsWith('/chat')} />
-                {unreadCount > 0 && <span className="zq-badge-count">{unreadCount}</span>}
+                {visibleUnreadCount > 0 && <span className="zq-badge-count">{visibleUnreadCount}</span>}
               </div>
               <span className="zq-nav-label">Direct Sync</span>
             </NavLink>
@@ -224,7 +220,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             >
               <div className="zq-nav-icon-container">
                 <NotificationsIcon size={22} active={showNotifications} />
-                <span className="zq-badge-dot" />
+                {visibleUnreadCount > 0 && <span className="zq-badge-dot" />}
               </div>
               <span className="zq-nav-label">Aura Sparks</span>
             </button>
@@ -374,7 +370,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {(notifications.length > 0 ? notifications : mockSparks).map((s) => {
+            {notifications.map((s) => {
               const username = s.actor?.username || s.user;
               const message = s.message || `${s.action}`;
               const time = s.createdAt ? new Date(s.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : s.time;
@@ -433,6 +429,9 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
               </div>
               );
             })}
+            {notifications.length === 0 && (
+              <div className="zq-notification-empty">No new activity yet.</div>
+            )}
           </div>
 
           <div style={{ padding: '10px', textAlign: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>

@@ -41,11 +41,21 @@ export class ChatService {
 
   async postMessage(conversationId: string, senderId: string, content: string) {
     await this.ensureParticipant(conversationId, senderId);
-    const conversation = await (this.prisma as any).conversation.findUnique({ where: { id: conversationId }, select: { status: true } });
+    const conversation = await (this.prisma as any).conversation.findUnique({ where: { id: conversationId }, select: { status: true, participants: { select: { userId: true } } } });
     if (conversation?.status === 'REJECTED') throw new ForbiddenException('This chat request was rejected. You may request again later.');
     const text = (content || '').trim();
     if (!text) throw new ForbiddenException('Message cannot be empty');
-    return (this.prisma as any).message.create({ data: { conversationId, senderId, content: text } });
+    const message = await (this.prisma as any).message.create({ data: { conversationId, senderId, content: text } });
+    const recipient = conversation?.participants?.find((participant: { userId: string }) => participant.userId !== senderId);
+    if (recipient) {
+      const sender = await this.prisma.user.findUnique({ where: { id: senderId }, select: { username: true } });
+      if (sender) {
+        await this.prisma.notification.create({
+          data: { recipientId: recipient.userId, actorId: senderId, type: 'MESSAGE', message: `@${sender.username} sent you a message.` },
+        });
+      }
+    }
+    return message;
   }
 
   async getMessages(conversationId: string, viewerId: string) {
