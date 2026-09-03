@@ -49,6 +49,11 @@
   padding: 0;
 }
 
+/* Netlify's injected credit iframe must not cover app controls. */
+#nl-badge-frame {
+  display: none !important;
+}
+
 body {
   font-family: var(--font-family);
   background-color: var(--zq-bg);
