@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { api, getAvatarUrl } from '../api/client';
 import { MessagesIcon } from './Icons';
@@ -45,7 +46,7 @@ export default function FollowersModal({ title, users, onClose, onFollowToggled 
     }
   };
 
-  return (
+  return createPortal((
     <div
       className="zq-connections-modal-overlay"
       onClick={onClose}
@@ -244,5 +245,5 @@ export default function FollowersModal({ title, users, onClose, onFollowToggled 
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }

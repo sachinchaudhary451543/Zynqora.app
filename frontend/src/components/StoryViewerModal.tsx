@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AuraSparkIcon } from './Icons';
 import { getDefaultAvatar, getAvatarUrl, resolveMediaUrl } from '../api/client';
 import { HlsVideo } from './PostCard';
@@ -106,7 +107,7 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
     avatarUrl: storyAvatar,
   });
 
-  return (
+  return createPortal((
     <div
       onClick={onClose}
       className="zq-story-viewer-overlay"
@@ -326,5 +327,5 @@ export default function StoryViewerModal({ story, onClose }: StoryViewerModalPro
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
