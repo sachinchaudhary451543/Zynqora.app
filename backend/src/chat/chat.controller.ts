@@ -13,6 +13,11 @@ export class ChatController {
     return this.chatService.getOrCreateConversation(user.userId, username);
   }
 
+  @Get('conversations')
+  getConversations(@CurrentUser() user: { userId: string }) {
+    return this.chatService.getConversations(user.userId);
+  }
+
   @Post('conversation/:id/messages')
   postMessage(@CurrentUser() user: { userId: string }, @Param('id') id: string, @Body() body: { content: string }) {
     return this.chatService.postMessage(id, user.userId, body.content);

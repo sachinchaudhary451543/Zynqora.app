@@ -66,18 +66,24 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    api.getSuggestions()
-      .then((data) => {
-        setConversations(data);
+    const loadConversations = async () => {
+      try {
+        const records = await api.getConversations();
+        const users = records.map((record) => record.user);
+        setConversations(users);
         if (activeUsername) {
-          const selected = data.find((conversation) => conversation.username === activeUsername);
+          const selected = users.find((conversation) => conversation.username === activeUsername);
           if (selected) setActiveUser(selected);
         }
-        if (!username && data.length > 0 && !isMobile) {
-          setActiveUsername(data[0].username);
-        }
-      })
-      .catch(() => {});
+        if (!username && users.length > 0 && !isMobile) setActiveUsername(users[0].username);
+      } catch {
+        try {
+          const suggestions = await api.getSuggestions();
+          setConversations(suggestions);
+        } catch { setConversations([]); }
+      }
+    };
+    loadConversations();
   }, [isMobile]);
 
   useEffect(() => {
@@ -99,6 +105,11 @@ export default function ChatPage() {
       try {
         const c = await api.createConversation(activeUsername);
         setConv(c);
+        const createdUser = c.participants?.find((participant: any) => participant.userId !== user?.id)?.user;
+        if (createdUser) {
+          setConversations((current) => current.some((item) => item.username === createdUser.username) ? current : [createdUser, ...current]);
+          setActiveUser(createdUser);
+        }
         const ms = await api.getMessages(c.id);
         setMessages(ms || []);
       } catch (err) {

@@ -221,6 +221,7 @@ export const api = {
   getUserStories: (username: string) => request<any[]>(`/stories/${username}`),
   // Chat
   createConversation: (username: string) => request<{ id: string; participants: any[] }>(`/chat/conversation/${username}`, { method: 'POST' }),
+  getConversations: () => request<Array<{ id: string; status: string; requesterId?: string; lastMessage: any; user: User }>>('/chat/conversations'),
   postMessage: (conversationId: string, content: string) =>
     request(`/chat/conversation/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ content }) }),
   getMessages: (conversationId: string) => request<any[]>(`/chat/conversation/${conversationId}/messages`),

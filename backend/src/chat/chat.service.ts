@@ -5,6 +5,29 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ChatService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getConversations(userId: string) {
+    const conversations = await (this.prisma as any).conversation.findMany({
+      where: { participants: { some: { userId } } },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        participants: {
+          where: { userId: { not: userId } },
+          include: { user: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } } },
+        },
+        messages: { orderBy: { createdAt: 'desc' }, take: 1, select: { content: true, createdAt: true, senderId: true } },
+      },
+    });
+    return conversations
+      .map((conversation: any) => ({
+        id: conversation.id,
+        status: conversation.status,
+        requesterId: conversation.requesterId,
+        lastMessage: conversation.messages[0] || null,
+        user: conversation.participants[0]?.user || null,
+      }))
+      .filter((conversation: any) => conversation.user);
+  }
+
   async getOrCreateConversation(userAId: string, userBUsername: string) {
     const userB = await this.prisma.user.findUnique({ where: { username: userBUsername }, select: { id: true } });
     if (!userB) throw new NotFoundException('User not found');
@@ -19,7 +42,12 @@ export class ChatService {
       },
       include: { participants: true },
     });
-    if (existing) return existing;
+    if (existing) {
+      return this.prisma.conversation.findUnique({
+        where: { id: existing.id },
+        include: { participants: { include: { user: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } } } } },
+      });
+    }
 
     return (this.prisma as any).conversation.create({
       data: {
@@ -27,7 +55,7 @@ export class ChatService {
         requesterId: userAId,
         participants: { create: [{ userId: userAId }, { userId: userB.id }] },
       },
-      include: { participants: true },
+      include: { participants: { include: { user: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } } } } },
     });
   }
 
