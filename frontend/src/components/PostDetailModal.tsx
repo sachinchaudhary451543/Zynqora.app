@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Post, Comment, api, getAvatarUrl, resolveMediaUrl } from '../api/client';
 import { NotificationsIcon, CommentIcon, ShareIcon, BookmarkIcon } from './Icons';
+import { HlsVideo } from './PostCard';
 
 interface PostDetailModalProps {
   post: Post | null;
@@ -103,8 +104,12 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
                 background: '#000',
               }}
             />
-          ) : post.mediaType === 'video' || (post.mediaUrl && post.mediaUrl.endsWith('.mp4')) ? (
-            <video src={resolveMediaUrl(post.mediaUrl) || ''} controls autoPlay style={{ width: '100%', height: '100%' }} />
+          ) : post.mediaType === 'video' || (post.mediaUrl && /\.(mp4|webm|mov|m4v|m3u8)(?:[?#].*)?$/i.test(post.mediaUrl)) ? (
+            /\.m3u8(?:[?#].*)?$/i.test(post.mediaUrl || '') ? (
+              <HlsVideo src={resolveMediaUrl(post.mediaUrl) || ''} onError={() => {}} />
+            ) : (
+              <video src={resolveMediaUrl(post.mediaUrl) || ''} controls autoPlay style={{ width: '100%', height: '100%' }} />
+            )
           ) : (
             <img src={resolveMediaUrl(post.mediaUrl) || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&fit=crop'} alt="Post media" />
           )}

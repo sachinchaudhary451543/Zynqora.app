@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import Hls from 'hls.js';
 import { Link } from 'react-router-dom';
 import { Post, api, getAvatarUrl, getDefaultAvatar, resolveMediaUrl } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -11,6 +12,35 @@ import {
   MoreDotsIcon,
   AuraSparkIcon,
 } from './Icons';
+
+export function HlsVideo({ src, onError }: { src: string; onError: () => void }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = src;
+      return;
+    }
+
+    if (!Hls.isSupported()) {
+      onError();
+      return;
+    }
+
+    const hls = new Hls({ enableWorker: true });
+    hls.loadSource(src);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (data.fatal) onError();
+    });
+    return () => hls.destroy();
+  }, [src, onError]);
+
+  return <video ref={videoRef} controls playsInline onError={onError} />;
+}
 
 export default function PostCard({ post }: { post: Post }) {
   const { user } = useAuth();
@@ -157,7 +187,11 @@ export default function PostCard({ post }: { post: Post }) {
               onError={() => setMediaFailed(true)}
             />
           ) : isVideo ? (
-            <video src={resolveMediaUrl(post.mediaUrl)} controls playsInline onError={() => setMediaFailed(true)} />
+            /\.m3u8(?:[?#].*)?$/i.test(post.mediaUrl) ? (
+              <HlsVideo src={resolveMediaUrl(post.mediaUrl)} onError={() => setMediaFailed(true)} />
+            ) : (
+              <video src={resolveMediaUrl(post.mediaUrl)} controls playsInline onError={() => setMediaFailed(true)} />
+            )
           ) : (
             <img src={resolveMediaUrl(post.mediaUrl)} alt="Sync media" onError={() => setMediaFailed(true)} />
           )}

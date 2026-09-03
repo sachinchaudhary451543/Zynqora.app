@@ -97,7 +97,7 @@ export default function FloatingMessagesWidget() {
                   />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#fff' }}>{u.name}</div>
+                  <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--zq-text-primary)' }}>{u.name}</div>
                   <div style={{ fontSize: '12px', color: 'var(--zq-text-secondary)' }}>@{u.username}</div>
                 </div>
                 <span style={{ fontSize: '10px', color: 'var(--zq-accent-cyan)', fontWeight: 700 }}>SYNC</span>
