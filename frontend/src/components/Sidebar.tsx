@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getAvatarUrl } from '../api/client';
+import { api, getAvatarUrl } from '../api/client';
 import {
   ZynqoraLogo,
   ZynqoraWordmark,
@@ -29,6 +29,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
   const location = useLocation();
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [showInsights, setShowInsights] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
   const sparksRef = useRef<HTMLDivElement | null>(null);
@@ -47,6 +48,10 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    api.getNotifications().then(setNotifications).catch(() => setNotifications([]));
   }, []);
 
   const handleLogout = () => {
@@ -369,12 +374,16 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {mockSparks.map((s) => (
+            {(notifications.length > 0 ? notifications : mockSparks).map((s) => {
+              const username = s.actor?.username || s.user;
+              const message = s.message || `${s.action}`;
+              const time = s.createdAt ? new Date(s.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : s.time;
+              return (
               <div
                 key={s.id}
                 onClick={() => {
                   setShowNotifications(false);
-                  navigate(`/profile/${s.user}`);
+                  navigate(`/profile/${username}`);
                 }}
                 style={{
                   padding: '10px 12px',
@@ -411,18 +420,19 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
                     fontSize: '13px',
                   }}
                 >
-                  {s.user.charAt(0).toUpperCase()}
+                  {username.charAt(0).toUpperCase()}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '12.5px', color: '#fff', lineHeight: 1.4 }}>
-                    <strong>@{s.user}</strong> {s.action}
+                    <strong>@{username}</strong> {message}
                   </div>
                   <div style={{ fontSize: '10.5px', color: '#00dfd8', marginTop: '2px' }}>
-                    {s.time}
+                    {time}
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <div style={{ padding: '10px', textAlign: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>

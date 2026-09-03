@@ -176,6 +176,7 @@ export const api = {
 
   getFollowers: (username: string) => request<any[]>(`/users/${username}/followers`),
   getFollowing: (username: string) => request<any[]>(`/users/${username}/following`),
+  getNotifications: () => request<any[]>('/users/me/notifications'),
 
   updateProfile: (data: {
     name?: string;

@@ -48,6 +48,12 @@ export class UsersController {
     return this.usersService.unfollow(user.userId, username);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('me/notifications')
+  getNotifications(@CurrentUser() user: { userId: string }) {
+    return this.usersService.getNotifications(user.userId);
+  }
+
   // Followers / Following lists
   @UseGuards(JwtAuthGuard)
   @Get(':username/followers')

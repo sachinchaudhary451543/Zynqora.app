@@ -47,6 +47,7 @@ export default function FollowersModal({ title, users, onClose, onFollowToggled 
 
   return (
     <div
+      className="zq-connections-modal-overlay"
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
@@ -55,14 +56,16 @@ export default function FollowersModal({ title, users, onClose, onFollowToggled 
       }}
     >
       <div
+        className="zq-connections-modal"
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'linear-gradient(180deg, #13131f 0%, #0d0d18 100%)',
-          border: '1px solid rgba(139,92,246,0.2)',
-          borderRadius: 24,
+          background: '#ffffff',
+          border: '1px solid #bfd0dc',
+          borderRadius: 18,
           width: '100%',
           maxWidth: 440,
-          maxHeight: '80vh',
+          height: 'min(520px, calc(100dvh - 32px))',
+          maxHeight: 'calc(100dvh - 32px)',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: `0 32px 80px rgba(0,0,0,0.7), 0 0 60px ${auraColor}18`,
@@ -74,7 +77,7 @@ export default function FollowersModal({ title, users, onClose, onFollowToggled 
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.07)'
         }}>
-          <span style={{ fontWeight: 700, fontSize: 17, color: '#fff', letterSpacing: 0.3 }}>{title}</span>
+          <span style={{ fontWeight: 800, fontSize: 17, color: 'var(--zq-text-primary)', letterSpacing: 0.3 }}>{title}</span>
           <button
             onClick={onClose}
             style={{
@@ -103,7 +106,7 @@ export default function FollowersModal({ title, users, onClose, onFollowToggled 
               style={{
                 width: '100%', padding: '9px 14px 9px 34px', borderRadius: 12,
                 background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
-                color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                color: 'var(--zq-text-primary)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
                 transition: 'border-color 0.2s',
               }}
               onFocus={e => (e.target.style.borderColor = `${auraColor}66`)}
@@ -159,8 +162,8 @@ export default function FollowersModal({ title, users, onClose, onFollowToggled 
                       />
                     </div>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: '#e8e8f0', letterSpacing: 0.2 }}>{u.username}</div>
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{u.name}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--zq-text-primary)', letterSpacing: 0.2 }}>{u.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--zq-text-secondary)', marginTop: 2 }}>@{u.username}</div>
                     </div>
                   </div>
 

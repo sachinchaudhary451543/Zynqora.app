@@ -88,13 +88,31 @@ export class UsersService {
     if (!target) throw new NotFoundException('User not found');
     if (target.id === followerId) throw new BadRequestException('Cannot follow yourself');
 
-    await this.prisma.follow.upsert({
+    const relation = await this.prisma.follow.upsert({
       where: { followerId_followingId: { followerId, followingId: target.id } },
       create: { followerId, followingId: target.id },
       update: {},
     });
 
+    if (relation) {
+      const actor = await this.prisma.user.findUnique({ where: { id: followerId }, select: { username: true } });
+      if (actor) {
+        await this.prisma.notification.create({
+          data: { recipientId: target.id, actorId: followerId, type: 'FOLLOW', message: `@${actor.username} started following you.` },
+        });
+      }
+    }
+
     return { following: true, mutual: await this.isMutual(followerId, target.id) };
+  }
+
+  async getNotifications(userId: string) {
+    return this.prisma.notification.findMany({
+      where: { recipientId: userId },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      include: { actor: { select: { username: true, name: true, avatarUrl: true, profileImage: true } } },
+    });
   }
 
   async unfollow(followerId: string, targetUsername: string) {

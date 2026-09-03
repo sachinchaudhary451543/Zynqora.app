@@ -39,6 +39,8 @@ model User {
   stories      Story[]
   conversations ConversationParticipant[]
   messages     Message[]
+  notificationsReceived Notification[] @relation("NotificationRecipient")
+  notificationsSent     Notification[] @relation("NotificationActor")
 }
 
 model Follow {
@@ -52,6 +54,21 @@ model Follow {
 
   @@unique([followerId, followingId])
   @@index([followingId])
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  recipientId String
+  actorId     String
+  type        String
+  message     String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  recipient User @relation("NotificationRecipient", fields: [recipientId], references: [id])
+  actor     User @relation("NotificationActor", fields: [actorId], references: [id])
+
+  @@index([recipientId, createdAt])
 }
 
 // Visibility scopes control who can see a post -
