@@ -1588,6 +1588,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .zq-chat-composer > div:first-child::-webkit-scrollbar { display: none; }
 .zq-chat-user-name, .zq-active-chat-name { color: var(--zq-text-primary) !important; }
 .zq-chat-user-handle, .zq-active-chat-handle { color: #087c9c !important; }
+.zq-message-received { background: #eef4f8 !important; color: var(--zq-text-primary) !important; border-color: #c7d8e2 !important; }
+.zq-message-mine { color: #fff !important; }
 
 [data-theme='light'] .zq-sparks-btn { color: #087c9c !important; }
 [data-theme='light'] .zq-sparks-btn + * { color: var(--zq-text-primary); }

@@ -533,14 +533,15 @@ export default function ChatPage() {
                         }}
                       >
                         <div
+                          className={isMine ? 'zq-message-bubble zq-message-mine' : 'zq-message-bubble zq-message-received'}
                           style={{
                             padding: '11px 16px',
                             borderRadius: '18px',
                             background: isMine
                               ? 'linear-gradient(135deg, #7928ca 0%, #0070f3 100%)'
-                              : 'rgba(255, 255, 255, 0.07)',
-                            color: '#fff',
-                            border: isMine ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+                              : '#eef4f8',
+                            color: isMine ? '#fff' : 'var(--zq-text-primary)',
+                            border: isMine ? 'none' : '1px solid #c7d8e2',
                             boxShadow: isMine
                               ? '0 4px 16px rgba(121, 40, 202, 0.3)'
                               : '0 2px 10px rgba(0, 0, 0, 0.2)',
