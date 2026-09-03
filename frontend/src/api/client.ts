@@ -1,5 +1,5 @@
-// Use the same-origin API in production; localhost is only a development default.
-const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? 'http://localhost:3000/api' : '/api');
+// Keep production auth/data requests on the deployed API even if the host omits build-time env vars.
+const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? 'http://localhost:3000/api' : 'https://zynqora-api.onrender.com/api');
 
 function getApiOrigin() {
   try {
