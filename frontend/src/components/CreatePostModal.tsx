@@ -15,7 +15,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
   const [mediaType, setMediaType] = useState<'image' | 'video' | ''>('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [visibility, setVisibility] = useState<'TREE' | 'FOLLOWERS' | 'CIRCLE'>('FOLLOWERS');
+  const [visibility, setVisibility] = useState<'TREE' | 'FOLLOWERS' | 'CIRCLE'>('TREE');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showLive, setShowLive] = useState(false);

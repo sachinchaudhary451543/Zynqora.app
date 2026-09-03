@@ -31,7 +31,7 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
         }
       }
 
-      await api.createPost({ content: content || undefined, mediaUrl: finalMediaUrl || undefined, mediaType: mediaType || undefined });
+      await api.createPost({ content: content || undefined, mediaUrl: finalMediaUrl || undefined, mediaType: mediaType || undefined, visibility: 'TREE' });
       setContent('');
       if (mediaUrl.startsWith('blob:')) URL.revokeObjectURL(mediaUrl);
       setMediaUrl('');

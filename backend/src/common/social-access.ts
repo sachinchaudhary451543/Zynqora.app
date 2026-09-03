@@ -16,7 +16,7 @@ export const authorSelect = {
 };
 
 export function normalizePostVisibility(visibility?: string | null): PostVisibility {
-  return POST_VISIBILITIES.includes(visibility as PostVisibility) ? (visibility as PostVisibility) : 'FOLLOWERS';
+  return POST_VISIBILITIES.includes(visibility as PostVisibility) ? (visibility as PostVisibility) : 'TREE';
 }
 
 export function normalizeProfileVisibility(visibility?: string | null): ProfileVisibility {
