@@ -625,6 +625,16 @@ input, textarea, select {
   display: block;
 }
 
+.zq-post-media-fallback {
+  padding: 14px 18px;
+  background: #f4f8fb;
+  border-top: 1px solid var(--zq-glass-border);
+  border-bottom: 1px solid var(--zq-glass-border);
+  color: var(--zq-text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
 .zq-post-actions-panel {
   padding: 12px 18px 6px 18px;
 }

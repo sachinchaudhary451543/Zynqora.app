@@ -20,6 +20,7 @@ export default function PostCard({ post }: { post: Post }) {
   const [saved, setSaved] = useState(false);
   const [showSparkAnim, setShowSparkAnim] = useState(false);
   const [commentCount, setCommentCount] = useState(post._count?.comments || 0);
+  const [mediaFailed, setMediaFailed] = useState(false);
 
   const authorAvatar =
     post.author.username === user?.username
@@ -90,7 +91,7 @@ export default function PostCard({ post }: { post: Post }) {
   };
 
   const ytEmbedUrl = getYouTubeEmbedUrl(post.mediaUrl);
-  const isVideo = post.mediaType === 'video' || (post.mediaUrl && (post.mediaUrl.endsWith('.mp4') || post.mediaUrl.endsWith('.webm')));
+  const isVideo = post.mediaType === 'video' || Boolean(post.mediaUrl && /\.(mp4|webm|mov|m4v|m3u8)(?:[?#].*)?$/i.test(post.mediaUrl));
 
   // Circle Badge determined by post content or author
   const circleBadge = post.content?.toLowerCase().includes('code') || post.content?.toLowerCase().includes('app')
@@ -138,7 +139,7 @@ export default function PostCard({ post }: { post: Post }) {
       </div>
 
       {/* Post Media */}
-      {post.mediaUrl && (
+      {post.mediaUrl && !mediaFailed && (
         <div className="zq-post-media-wrap" onDoubleClick={handleDoubleTap}>
           {ytEmbedUrl ? (
             <iframe
@@ -153,11 +154,12 @@ export default function PostCard({ post }: { post: Post }) {
                 border: 'none',
                 display: 'block',
               }}
+              onError={() => setMediaFailed(true)}
             />
           ) : isVideo ? (
-            <video src={resolveMediaUrl(post.mediaUrl)} controls playsInline />
+            <video src={resolveMediaUrl(post.mediaUrl)} controls playsInline onError={() => setMediaFailed(true)} />
           ) : (
-            <img src={resolveMediaUrl(post.mediaUrl)} alt="Sync media" />
+            <img src={resolveMediaUrl(post.mediaUrl)} alt="Sync media" onError={() => setMediaFailed(true)} />
           )}
 
           {/* Holographic Spark Explosion */}
@@ -177,6 +179,11 @@ export default function PostCard({ post }: { post: Post }) {
               {reactionType || '⚡'}
             </div>
           )}
+        </div>
+      )}
+      {post.mediaUrl && mediaFailed && (
+        <div className="zq-post-media-fallback" role="status">
+          Media unavailable
         </div>
       )}
 
