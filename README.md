@@ -1,131 +1,342 @@
-# Family App — MVP slice
+<div align="center">
 
-Auth, profiles, follow/mutual-follow, and a posts feed. This is the foundation
-everything else (chat, video calls, games, AI generation) will build on top of.
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:00D4FF,45:7C3AED,100:FF2EA6&height=230&section=header&text=ZYNQORA&fontSize=64&fontColor=ffffff&animation=fadeIn&fontAlignY=36&desc=Your%20People.%20Your%20Circle.%20Your%20Zynqora.&descAlignY=58&descSize=18" alt="Zynqora banner" />
 
-## Structure
+  <p>
+    <strong>SYNC · CORE · AURA</strong>
+  </p>
 
+  <p>
+    <a href="https://zynqora.netlify.app/login"><img src="https://img.shields.io/badge/Live%20App-zynqora.netlify.app-FF2EA6?style=for-the-badge&logo=netlify&logoColor=white" alt="Live app" /></a>
+    <a href="https://github.com/sachinchaudhary451543/Zynqora.app"><img src="https://img.shields.io/badge/Source-GitHub-181717?style=for-the-badge&logo=github" alt="GitHub source" /></a>
+    <img src="https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=111827" alt="React and Vite" />
+    <img src="https://img.shields.io/badge/API-NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" alt="NestJS" />
+  </p>
+
+  <p>
+    <img src="https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+    <img src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL" />
+    <img src="https://img.shields.io/badge/Prisma-2D3748?style=flat-square&logo=prisma&logoColor=white" alt="Prisma" />
+    <img src="https://img.shields.io/badge/Socket.IO-010101?style=flat-square&logo=socketdotio&logoColor=white" alt="Socket.IO" />
+    <img src="https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker" />
+  </p>
+
+</div>
+
+---
+
+## ✨ Overview
+
+**Zynqora** is a futuristic social media platform designed around meaningful circles, real-time sync, and a premium neon-first user experience.
+
+It brings together profile discovery, posts, stories, chat, reactions, comments, aura-style identity, and community-focused interactions inside a polished full-stack TypeScript application.
+
+> **Tagline:** Your People. Your Circle. Your Zynqora.
+
+---
+
+## 🌐 Live Experience
+
+- 🚀 **Live App:** [https://zynqora.netlify.app/login](https://zynqora.netlify.app/login)
+- 🧭 **Signup:** [https://zynqora.netlify.app/signup](https://zynqora.netlify.app/signup)
+- 💻 **Repository:** [github.com/sachinchaudhary451543/Zynqora.app](https://github.com/sachinchaudhary451543/Zynqora.app)
+
+---
+
+## 🖼️ Product Preview
+
+<div align="center">
+
+| Landing / Login Concept | Product Feel |
+| --- | --- |
+| `ZYNQORA · SYNC · CORE · AURA` | Neon social dashboard |
+| `Your People. Your Circle. Your Zynqora.` | Real-time circles and aura-driven identity |
+| `Create Your Circle` | Community-first onboarding |
+
+</div>
+
+---
+
+## 🔥 Premium Features
+
+<table>
+  <tr>
+    <td width="50%">
+      <h3>🌊 Sync Stream</h3>
+      <p>A modern social feed built for posts, reactions, comments, media previews, and real-time interaction flow.</p>
+    </td>
+    <td width="50%">
+      <h3>⭕ Circles Hub</h3>
+      <p>Community-first social graph experience for following, mutual connections, and circle-style relationship building.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>⚡ Direct Sync</h3>
+      <p>Real-time chat foundation powered by Socket.IO and authenticated backend events.</p>
+    </td>
+    <td width="50%">
+      <h3>💫 Aura System</h3>
+      <p>Profile-first identity layer with user presence, aura cards, suggestions, and modern social discovery.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>📸 Stories & Media</h3>
+      <p>Story modules and upload architecture designed for social content sharing and richer media experiences.</p>
+    </td>
+    <td width="50%">
+      <h3>🛡️ Privacy First</h3>
+      <p>JWT authentication, password hashing, protected APIs, and environment-based configuration.</p>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 🧱 Tech Architecture
+
+```mermaid
+flowchart LR
+    User[User Browser] --> Web[React + Vite Frontend]
+    Web --> API[NestJS API]
+    Web <--> RT[Socket.IO Realtime]
+    API --> Prisma[Prisma ORM]
+    Prisma --> DB[(PostgreSQL)]
+    API --> Storage[S3-compatible Upload Storage]
+    Web --> Netlify[Netlify Hosting]
+    API --> Render[Render Backend]
 ```
-family-app/
-├── docker-compose.yml     # Postgres for local dev
-├── backend/               # NestJS + Prisma + JWT auth
-└── frontend/              # React + Vite + TypeScript
+
+### Frontend
+
+- React 18
+- Vite 5
+- TypeScript
+- React Router
+- Socket.IO client
+- HLS/media-ready dependencies
+- Premium custom CSS with neon dashboard styling
+
+### Backend
+
+- NestJS 10
+- Prisma ORM
+- PostgreSQL
+- JWT authentication
+- bcrypt password hashing
+- Socket.IO gateways
+- Upload module with S3-compatible architecture
+
+---
+
+## 📁 Repository Structure
+
+```text
+Zynqora.app/
+├── backend/                 # NestJS API, Prisma schema, auth, posts, chat, uploads
+│   ├── prisma/              # Database schema and Prisma configuration
+│   └── src/                 # Application modules and services
+├── frontend/                # React + Vite + TypeScript client
+│   └── src/                 # Pages, components, API client, auth context, realtime client
+├── docker-compose.yml       # Local PostgreSQL development service
+├── netlify.toml             # Netlify frontend deployment config
+├── render.yaml              # Render backend deployment blueprint
+└── README.md                # Project documentation
 ```
 
-## Run it locally
+---
 
-### 1. Start Postgres
+## ⚙️ Local Development
+
+### Prerequisites
+
+- Node.js 20+
+- npm
+- Docker Desktop
+- PostgreSQL-compatible database for production deployments
+
+### 1. Clone the repository
 
 ```bash
-cd family-app
+git clone https://github.com/sachinchaudhary451543/Zynqora.app.git
+cd Zynqora.app
+```
+
+### 2. Start PostgreSQL locally
+
+```bash
 docker compose up -d
 ```
 
-### 2. Backend
+### 3. Configure the backend
 
 ```bash
 cd backend
-cp .env.example .env        # edit JWT_SECRET if you want
+cp .env.example .env
 npm install
-npx prisma migrate dev --name init   # creates tables
+npm run prisma:push
 npm run start:dev
 ```
 
-Backend runs at `http://localhost:3000/api`.
+Backend runs at:
 
-### 3. Frontend
+```text
+http://localhost:3000/api
+```
+
+### 4. Configure the frontend
 
 ```bash
-cd frontend
+cd ../frontend
+cp .env.example .env
 npm install
 npm run dev
 ```
 
-Frontend runs at `http://localhost:5173`.
+Frontend runs at:
 
-## Production deployment
+```text
+http://localhost:5173
+```
 
-### Netlify frontend
+---
 
-Import this repository into Netlify. The included `netlify.toml` uses
-`frontend` as the base directory, runs `npm run build`, publishes `dist`, and
-adds the SPA fallback required by React Router. In Netlify site settings add
-`VITE_API_BASE=https://YOUR-BACKEND-HOST/api`, then redeploy. The backend must
-be deployed separately on an HTTPS host; Netlify does not run this NestJS API.
+## 🔐 Environment Variables
 
-### Render backend from the same GitHub repository
+Use `.env.example` files as templates. Do **not** commit real `.env` files.
 
-The repository includes `render.yaml`. In Render choose **New → Blueprint**,
-select `sachinchaudhary451543/Zynqora.app`, and apply the blueprint. Enter
-`DATABASE_URL` (Supabase PostgreSQL), `CORS_ORIGIN` (the Netlify URL), and
-`SERVER_BASE_URL` (the Render service URL) when prompted. Render then builds
-and starts the backend automatically and checks `/api/health`.
+### Backend
 
-Build the frontend with `VITE_API_BASE=https://api.example.com/api npm run build`
-and serve `frontend/dist` from a static host with SPA fallback to `index.html`.
-Build the API with `npm run build` and run `npm start` with a strong
-`JWT_SECRET`, `NODE_ENV=production`, an explicit `DATABASE_URL`, and a
-restricted `CORS_ORIGIN`. The health check is `GET /api/health`.
-The Supabase database is initialized with `npm run prisma:push` for the first
-deployment; use reviewed Prisma migrations for subsequent schema changes.
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | Strong signing secret for authentication |
+| `JWT_EXPIRES_IN` | Token expiration window |
+| `PORT` | API server port |
+| `CORS_ORIGIN` | Allowed frontend origin in production |
+| `SERVER_BASE_URL` | Public backend URL for deployed environments |
 
-The schema is configured for managed PostgreSQL. Do not deploy
-`backend/prisma/dev.db` as shared production storage. Configure S3-compatible
-object storage for uploads rather than relying on local
-`backend/public/uploads`.
+### Frontend
 
-## Android packaging
+| Variable | Purpose |
+| --- | --- |
+| `VITE_API_BASE` | Base URL for the backend API |
 
-The React frontend is mobile-wrapper ready. After deploying the API, set
-`VITE_API_BASE` to its HTTPS URL, build the frontend, and add Capacitor Android
-(`@capacitor/core`, `@capacitor/cli`, `@capacitor/android`) with `npx cap add
-android`, `npx cap sync`, and `npx cap open android`. HTTPS, a production
-signing key, and Play Console configuration are required for release.
+---
 
-Calling currently provides the call UI and local media controls; production
-two-user calling still requires a WebRTC/LiveKit/Agora signaling service.
+## 🚀 Deployment
 
-## Try it
+### Frontend: Netlify
 
-1. Open `http://localhost:5173/signup`, create two accounts (e.g. in two
-   browser tabs — one normal, one incognito, so both sessions stay logged in).
-2. Visit `/profile/<other-username>` and click Follow from both accounts —
-   once it's mutual, that pair is unlocked for chat once you build it.
-3. Go to `/feed` and post something — it shows up because you always see
-   your own posts, plus anyone you follow.
+The repository includes `netlify.toml` for the React SPA.
 
-## What's already wired up, ready to build on
+Recommended configuration:
 
-- JWT auth (`Authorization: Bearer <token>`) protecting all `/users` and `/posts` routes
-- Password hashing with bcrypt (12 salt rounds)
-- `Follow` model + `isMutual()` check in `UsersService` — this is the gate to
-  use before allowing a chat thread to open
-- `Post.visibility` enum (`CIRCLE` / `TREE` / `FOLLOWERS`) already in the
-  schema, not yet enforced in the feed query — enforce it once you add
-  family "circles" as a real grouping
-- Feed query is cursor-paginated (`nextCursor`) so it won't fall over once
-  there's real data volume
+- Base directory: `frontend`
+- Build command: `npm run build`
+- Publish directory: `frontend/dist`
+- SPA fallback: enabled by `netlify.toml`
+- Environment variable: `VITE_API_BASE=https://your-backend-host/api`
 
-## Next slices to build, in order
+### Backend: Render
 
-1. **Chat** — new `Message` model + a `chat` module; gate thread creation
-   behind `usersService.isMutual()`. Add a WebSocket gateway
-   (`@nestjs/websockets`) for realtime delivery.
-2. **Media uploads** — presigned S3 upload URLs so the frontend uploads
-   directly to storage instead of through the API.
-3. **Video calls** — integrate LiveKit or Agora rather than building WebRTC
-   signaling from scratch.
-4. **Games** — a `GameSession` WebSocket gateway, reusing the same realtime
-   infra as chat.
-5. **AI generation** — an async job queue (BullMQ + Redis) calling an
-   image/video generation API, with a moderation step before any result is
-   shown.
+The repository includes `render.yaml` for backend deployment.
 
-## Notes on this sandbox environment
+Recommended production settings:
 
-`npx prisma generate` couldn't run in this sandbox because it needs to
-download engine binaries from `binaries.prisma.sh`, which isn't on this
-environment's network allowlist. On your own machine, with normal internet
-access, `npm install` + `npx prisma migrate dev` will work as documented
-above — this is a sandbox-only restriction, not a bug in the code. Both the
-backend and frontend TypeScript were type-checked here and compile cleanly.
+- Use managed PostgreSQL/Supabase for `DATABASE_URL`
+- Set a strong `JWT_SECRET`
+- Set `CORS_ORIGIN=https://zynqora.netlify.app`
+- Keep secrets in platform environment variables only
+- Use object storage for user uploads
+
+---
+
+## ✅ Current Modules
+
+- Authentication and authorization
+- User profiles
+- Follow and mutual-follow workflows
+- Posts feed
+- Likes and comments
+- Stories
+- Chat foundation
+- Suggestions and discovery
+- Upload handling
+- Realtime gateway structure
+- Health check endpoint
+
+---
+
+## 🗺️ Product Roadmap
+
+- [ ] Rich media upload pipeline with object storage
+- [ ] Production-grade realtime messaging UX
+- [ ] Notifications and activity center
+- [ ] Advanced circle privacy controls
+- [ ] Aura profile customization
+- [ ] Video/audio calling integration
+- [ ] AI-assisted content and community tools
+- [ ] Mobile packaging with Capacitor
+
+---
+
+## 🧪 Quality & Validation
+
+Recommended checks before deployment:
+
+```bash
+cd frontend
+npm run build
+
+cd ../backend
+npm run build
+```
+
+Also verify:
+
+- API health route
+- Login/signup flow
+- Post creation
+- Feed visibility
+- Chat connection
+- Upload path configuration
+- Production CORS origin
+
+---
+
+## 🛡️ Security Notes
+
+- Never commit `.env` files or real credentials.
+- Rotate secrets if they are ever exposed in logs, screenshots, commits, or deployment dashboards.
+- Use a long random `JWT_SECRET` in production.
+- Restrict CORS to the deployed frontend origin.
+- Store uploaded media outside the API container in production.
+- Review authentication guards before exposing new APIs.
+
+---
+
+## 👨‍💻 Author
+
+<div align="center">
+
+  Built with ambition by **Sachin Kumar**
+
+  <p>
+    <a href="https://github.com/sachinchaudhary451543"><img src="https://img.shields.io/badge/GitHub-sachinchaudhary451543-181717?style=for-the-badge&logo=github" alt="GitHub" /></a>
+    <a href="https://www.linkedin.com/in/sachin-kumar-679646218/"><img src="https://img.shields.io/badge/LinkedIn-Sachin%20Kumar-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" /></a>
+    <a href="https://codewithsp20079.netlify.app/"><img src="https://img.shields.io/badge/Portfolio-Visit-22C55E?style=for-the-badge&logo=netlify&logoColor=white" alt="Portfolio" /></a>
+  </p>
+
+</div>
+
+---
+
+<div align="center">
+
+  <h3>Sync more. Feel more. Be more.</h3>
+
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:FF2EA6,50:7C3AED,100:00D4FF&height=120&section=footer" alt="Zynqora footer" />
+
+</div>
