@@ -216,6 +216,7 @@ export const api = {
   createStory: (data: { videoUrl: string; thumbnail?: string; caption?: string; visibility?: string }) =>
     request('/stories', { method: 'POST', body: JSON.stringify(data) }),
   getActiveStories: () => request<any[]>('/stories/active'),
+  getUserStories: (username: string) => request<any[]>(`/stories/${username}`),
   // Chat
   createConversation: (username: string) => request<{ id: string; participants: any[] }>(`/chat/conversation/${username}`, { method: 'POST' }),
   postMessage: (conversationId: string, content: string) =>

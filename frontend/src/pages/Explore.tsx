@@ -152,7 +152,7 @@ export default function Explore() {
                 </div>
 
                 <div
-                  style={{ fontWeight: 800, fontSize: '14px', color: '#fff', cursor: 'pointer', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}
+                  style={{ fontWeight: 800, fontSize: '14px', color: 'var(--zq-text-primary)', cursor: 'pointer', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}
                   onClick={() => navigate(`/profile/${u.username}`)}
                 >
                   {u.name}

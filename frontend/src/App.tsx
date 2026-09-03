@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Feed from './pages/Feed';
-import Profile from './pages/Profile';
-import Explore from './pages/Explore';
-import CirclesHub from './pages/CirclesHub';
-import SettingsPage from './pages/Settings';
-import ChatPage from './pages/Chat';
-import FollowersPage from './pages/Followers';
-import FollowingPage from './pages/Following';
+const Login = React.lazy(() => import('./pages/Login'));
+const Signup = React.lazy(() => import('./pages/Signup'));
+const Feed = React.lazy(() => import('./pages/Feed'));
+const Profile = React.lazy(() => import('./pages/Profile'));
+const Explore = React.lazy(() => import('./pages/Explore'));
+const CirclesHub = React.lazy(() => import('./pages/CirclesHub'));
+const SettingsPage = React.lazy(() => import('./pages/Settings'));
+const ChatPage = React.lazy(() => import('./pages/Chat'));
+const FollowersPage = React.lazy(() => import('./pages/Followers'));
+const FollowingPage = React.lazy(() => import('./pages/Following'));
 import Sidebar from './components/Sidebar';
 import FloatingMessagesWidget from './components/FloatingMessagesWidget';
 import CreatePostModal from './components/CreatePostModal';
@@ -49,7 +49,8 @@ export default function App() {
 
       {/* Main Page Content */}
       <main className={user && !isAuthPage ? 'zq-main-content' : ''} style={{ flex: 1 }}>
-        <Routes>
+        <Suspense fallback={<div className="zq-route-loading">Loading your space...</div>}>
+          <Routes>
           <Route path="/login" element={user ? <Navigate to="/feed" replace /> : <Login />} />
           <Route path="/signup" element={user ? <Navigate to="/feed" replace /> : <Signup />} />
 
@@ -151,7 +152,8 @@ export default function App() {
             }
           />
           <Route path="*" element={<Navigate to="/feed" replace />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </main>
 
       {/* Floating Bottom-Right Messages Widget matching Screenshots 1, 2, 3 */}

@@ -157,7 +157,7 @@ export default function ChatPage() {
 
   return (
     <div
-      className="zq-chat-page-wrap"
+      className="zq-chat-page-wrap zq-chat-shell"
       style={{
         display: 'flex',
         maxWidth: '1150px',
@@ -176,6 +176,7 @@ export default function ChatPage() {
       {/* 1. Left Conversations Sidebar */}
       {showSidebar && (
         <div
+          className="zq-chat-sidebar-panel"
           style={{
             width: isMobile ? '100%' : '340px',
             borderRight: isMobile ? 'none' : '1px solid rgba(255, 255, 255, 0.08)',
@@ -291,11 +292,11 @@ export default function ChatPage() {
 
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 700, fontSize: '14px', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span className="zq-chat-user-name" style={{ fontWeight: 700, fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {cUser.name}
                         </span>
                       </div>
-                      <div style={{ fontSize: '12px', color: isSelected ? '#00dfd8' : '#8892b0', marginTop: '2px' }}>
+                      <div className="zq-chat-user-handle" style={{ fontSize: '12px', marginTop: '2px' }}>
                         @{cUser.username}
                       </div>
                     </div>
@@ -309,18 +310,18 @@ export default function ChatPage() {
 
       {/* 2. Right Chat Area */}
       {showChatArea && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'rgba(8, 10, 18, 0.6)', width: isMobile ? '100%' : 'auto' }}>
+        <div className="zq-chat-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', width: isMobile ? '100%' : 'auto' }}>
           {activeUsername ? (
             <>
               {/* Top Chat Header with Mobile Back button */}
               <div
+                className="zq-chat-header"
                 style={{
                   padding: '12px 18px',
                   borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  background: 'rgba(15, 18, 30, 0.7)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -570,6 +571,7 @@ export default function ChatPage() {
 
               {/* Bottom Message Input Bar */}
               <form
+                className="zq-chat-composer"
                 onSubmit={(e) => send(e)}
                 style={{
                   padding: '12px 16px',
