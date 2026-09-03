@@ -196,6 +196,7 @@ export const api = {
 
   createPost: (data: { content?: string; mediaUrl?: string; mediaType?: string; visibility?: string }) =>
     request<Post>('/posts', { method: 'POST', body: JSON.stringify(data) }),
+  deletePost: (postId: string) => request<{ deleted: boolean }>(`/posts/${postId}`, { method: 'DELETE' }),
 
   getFeed: (cursor?: string) =>
     request<{ posts: Post[]; nextCursor: string | null }>(`/posts/feed${cursor ? `?cursor=${cursor}` : ''}`),

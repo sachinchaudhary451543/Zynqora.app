@@ -108,8 +108,13 @@ export default function Feed() {
     loadStories();
 
     const handleCreated = () => loadFeed();
+    const handleDeleted = () => loadFeed();
     window.addEventListener('ig-post-created', handleCreated);
-    return () => window.removeEventListener('ig-post-created', handleCreated);
+    window.addEventListener('ig-post-deleted', handleDeleted);
+    return () => {
+      window.removeEventListener('ig-post-created', handleCreated);
+      window.removeEventListener('ig-post-deleted', handleDeleted);
+    };
   }, []);
 
   useEffect(() => {

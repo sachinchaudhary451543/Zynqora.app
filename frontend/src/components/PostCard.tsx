@@ -51,6 +51,7 @@ export default function PostCard({ post }: { post: Post }) {
   const [showSparkAnim, setShowSparkAnim] = useState(false);
   const [commentCount, setCommentCount] = useState(post._count?.comments || 0);
   const [mediaFailed, setMediaFailed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const authorAvatar =
     post.author.username === user?.username
@@ -110,6 +111,19 @@ export default function PostCard({ post }: { post: Post }) {
     }
   };
 
+  const handleDelete = async () => {
+    if (!user || user.username !== post.author.username || deleting) return;
+    if (!window.confirm('Delete this post permanently?')) return;
+    setDeleting(true);
+    try {
+      await api.deletePost(post.id);
+      window.dispatchEvent(new CustomEvent('ig-post-deleted', { detail: { postId: post.id } }));
+    } catch (err) {
+      console.error('Failed to delete post', err);
+      setDeleting(false);
+    }
+  };
+
   const getYouTubeEmbedUrl = (url?: string | null) => {
     if (!url) return null;
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
@@ -163,9 +177,11 @@ export default function PostCard({ post }: { post: Post }) {
           </div>
         </div>
 
-        <button className="zq-btn-glass" style={{ padding: '4px 8px', borderRadius: '8px' }} title="Options">
-          <MoreDotsIcon size={18} />
-        </button>
+        {user?.username === post.author.username && (
+          <button type="button" className="zq-btn-glass" style={{ padding: '4px 8px', borderRadius: '8px' }} title="Delete post" onClick={handleDelete} disabled={deleting}>
+            {deleting ? '...' : <MoreDotsIcon size={18} />}
+          </button>
+        )}
       </div>
 
       {/* Post Media */}

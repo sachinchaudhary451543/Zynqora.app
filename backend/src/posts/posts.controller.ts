@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { PostsService } from './posts.service';
@@ -22,5 +22,10 @@ export class PostsController {
   @Get('user/:username')
   getUserPosts(@CurrentUser() user: { userId: string }, @Param('username') username: string) {
     return this.postsService.getUserPosts(username, user.userId);
+  }
+
+  @Delete(':postId')
+  delete(@CurrentUser() user: { userId: string }, @Param('postId') postId: string) {
+    return this.postsService.delete(user.userId, postId);
   }
 }

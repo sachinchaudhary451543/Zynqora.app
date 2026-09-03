@@ -6,6 +6,10 @@ import { authorSelect, getFollowSets, normalizePostVisibility, visibleContentWhe
 export class StoriesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private normalizeStoryVisibility(visibility?: string) {
+    return ['PUBLIC', 'FOLLOWERS', 'CIRCLE'].includes(visibility || '') ? visibility : 'FOLLOWERS';
+  }
+
   private isForeignKeyError(error: unknown) {
     return typeof error === 'object' && error !== null && (error as { code?: string }).code === 'P2003';
   }
@@ -37,7 +41,7 @@ export class StoriesService {
           videoUrl: data.videoUrl.trim(),
           thumbnail: data.thumbnail,
           caption: data.caption,
-          visibility: normalizePostVisibility(data.visibility),
+          visibility: this.normalizeStoryVisibility(data.visibility),
           expiresAt,
         },
         include: {
@@ -84,7 +88,12 @@ export class StoriesService {
       where: {
         author: { username },
         expiresAt: { gt: now },
-        ...visibleContentWhere(viewerId, followingIds, mutualIds),
+        OR: [
+          { authorId: viewerId },
+          { visibility: 'PUBLIC' },
+          { visibility: 'FOLLOWERS', authorId: { in: followingIds } },
+          { visibility: 'CIRCLE', authorId: { in: mutualIds } },
+        ],
       },
       orderBy: { createdAt: 'desc' },
       include: {
