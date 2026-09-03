@@ -88,13 +88,16 @@ export class UsersService {
     if (!target) throw new NotFoundException('User not found');
     if (target.id === followerId) throw new BadRequestException('Cannot follow yourself');
 
-    const relation = await this.prisma.follow.upsert({
+    const existingRelation = await this.prisma.follow.findUnique({
+      where: { followerId_followingId: { followerId, followingId: target.id } },
+    });
+    await this.prisma.follow.upsert({
       where: { followerId_followingId: { followerId, followingId: target.id } },
       create: { followerId, followingId: target.id },
       update: {},
     });
 
-    if (relation) {
+    if (!existingRelation) {
       const actor = await this.prisma.user.findUnique({ where: { id: followerId }, select: { username: true } });
       if (actor) {
         await this.prisma.notification.create({

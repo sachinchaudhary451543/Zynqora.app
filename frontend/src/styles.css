@@ -1527,6 +1527,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .zq-connection-card div span { margin-top: 2px; color: var(--zq-text-secondary); font-size: 12px; }
 .zq-connection-arrow { color: var(--zq-accent-blue); font-size: 11px; font-weight: 700; }
 .zq-connections-error { padding: 14px; border-radius: 10px; color: #b42345; background: #fff1f3; border: 1px solid #f4b8c5; font-size: 13px; }
+.zq-connections-modal-overlay { padding: 12px; }
+.zq-connections-modal { width: min(440px, 100%); }
 .zq-moments-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
 .zq-moment-card { min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--zq-glass-border); border-radius: 12px; background: #fff; color: var(--zq-text-primary); text-align: left; cursor: pointer; }
 .zq-moment-card img { display: block; width: 100%; aspect-ratio: 3 / 4; object-fit: cover; background: #eaf2f6; }
@@ -1538,6 +1540,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 [data-theme='light'] .zq-story-username { color: var(--zq-text-primary) !important; }
 
 @media (max-width: 768px) {
+  .zq-connections-modal-overlay { padding: 10px; }
+  .zq-connections-modal { height: min(520px, calc(100dvh - 20px)) !important; max-height: calc(100dvh - 20px) !important; }
   .zq-connections-page { width: calc(100% - 20px); margin: 12px auto 76px; padding: 14px; border-radius: 14px; }
   .zq-connections-heading h1 { font-size: 20px; }
   .zq-chat-shell { height: calc(100dvh - 118px) !important; min-height: 0 !important; max-height: calc(100dvh - 118px) !important; overflow: hidden !important; }
