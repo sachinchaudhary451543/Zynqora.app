@@ -97,7 +97,7 @@ export default function Feed() {
   const loadStories = async () => {
     try {
       const st = await api.getActiveStories();
-      if (st && st.length > 0) setActiveStories(st);
+      setActiveStories(st || []);
     } catch (err) {
       // fallback to sample stories
     }
@@ -235,7 +235,7 @@ export default function Feed() {
             // Choose the element from the actual media extension so uploaded
             // photos are not rendered inside a <video> tag.
             const mediaUrl = story.videoUrl || story.mediaUrl || story.thumbnail || '';
-            const isVideo = /\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(mediaUrl);
+            const isVideo = /\.(mp4|webm|mov|m4v|m3u8)(?:[?#].*)?$/i.test(mediaUrl);
 
             return (
               <div

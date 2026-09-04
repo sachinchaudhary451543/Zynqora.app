@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { authorSelect, getFollowSets, normalizePostVisibility, visibleContentWhere } from '../common/social-access';
+import { authorSelect, getFollowSets } from '../common/social-access';
 
 @Injectable()
 export class StoriesService {
@@ -73,7 +73,15 @@ export class StoriesService {
     const now = new Date();
     const { followingIds, mutualIds } = await getFollowSets(this.prisma, viewerId);
     return this.prisma.story.findMany({
-      where: { expiresAt: { gt: now }, ...visibleContentWhere(viewerId, followingIds, mutualIds) },
+      where: {
+        expiresAt: { gt: now },
+        OR: [
+          { authorId: viewerId },
+          { visibility: 'PUBLIC' },
+          { visibility: 'FOLLOWERS', authorId: { in: followingIds } },
+          { visibility: 'CIRCLE', authorId: { in: mutualIds } },
+        ],
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         author: { select: authorSelect },
