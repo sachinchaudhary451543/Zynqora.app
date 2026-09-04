@@ -24,6 +24,8 @@ export class PostsService {
         content: dto.content,
         mediaUrl: dto.mediaUrl,
         mediaType: dto.mediaType,
+        musicUrl: dto.musicUrl,
+        musicType: dto.musicType,
         visibility: normalizePostVisibility(dto.visibility),
       },
       include: {

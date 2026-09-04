@@ -11,6 +11,14 @@ export class CreatePostDto {
   mediaUrl?: string;
 
   @IsOptional()
+  @IsString()
+  musicUrl?: string;
+
+  @IsOptional()
+  @IsIn(['audio'])
+  musicType?: 'audio';
+
+  @IsOptional()
   @IsIn(['image', 'video'])
   mediaType?: 'image' | 'video';
 

@@ -11,6 +11,12 @@ export const ALLOWED_UPLOAD_MIME_TYPES = new Set([
   'video/mp4',
   'video/webm',
   'video/quicktime',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/ogg',
+  'audio/mp4',
+  'audio/webm',
 ]);
 
 export function sanitizeUploadName(filename: string) {

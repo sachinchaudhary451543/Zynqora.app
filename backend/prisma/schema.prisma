@@ -80,6 +80,8 @@ model Post {
   content    String?
   mediaUrl   String?
   mediaType  String?        // "image" | "video" | null
+  musicUrl   String?
+  musicType  String?        // "audio"
   visibility String         @default("FOLLOWERS")
   createdAt  DateTime       @default(now())
 

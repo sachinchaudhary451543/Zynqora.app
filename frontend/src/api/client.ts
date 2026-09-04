@@ -83,6 +83,8 @@ export interface Post {
   content: string | null;
   mediaUrl: string | null;
   mediaType: string | null;
+  musicUrl?: string | null;
+  musicType?: string | null;
   visibility?: string;
   createdAt: string;
   author: {
@@ -195,7 +197,7 @@ export const api = {
   follow: (username: string) => request(`/users/${username}/follow`, { method: 'POST' }),
   unfollow: (username: string) => request(`/users/${username}/unfollow`, { method: 'POST' }),
 
-  createPost: (data: { content?: string; mediaUrl?: string; mediaType?: string; visibility?: string }) =>
+  createPost: (data: { content?: string; mediaUrl?: string; mediaType?: string; musicUrl?: string; musicType?: string; visibility?: string }) =>
     request<Post>('/posts', { method: 'POST', body: JSON.stringify(data) }),
   deletePost: (postId: string) => request<{ deleted: boolean }>(`/posts/${postId}`, { method: 'DELETE' }),
 

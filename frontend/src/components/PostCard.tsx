@@ -236,6 +236,12 @@ export default function PostCard({ post }: { post: Post }) {
           Media unavailable
         </div>
       )}
+      {post.musicUrl && (
+        <div className="zq-post-music">
+          <span>Music</span>
+          <audio controls preload="metadata" src={resolveMediaUrl(post.musicUrl)} />
+        </div>
+      )}
 
       {/* Actions & Aura Reaction Bar */}
       <div className="zq-post-actions-panel">

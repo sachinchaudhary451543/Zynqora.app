@@ -14,6 +14,9 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaType, setMediaType] = useState<'image' | 'video' | ''>('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [musicUrl, setMusicUrl] = useState('');
+  const [musicFile, setMusicFile] = useState<File | null>(null);
+  const [musicPreviewUrl, setMusicPreviewUrl] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<'TREE' | 'FOLLOWERS' | 'CIRCLE'>('TREE');
   const [loading, setLoading] = useState(false);
@@ -47,6 +50,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
 
     try {
       let finalMediaUrl = mediaUrl || undefined;
+      let finalMusicUrl = musicUrl || undefined;
 
       if (mediaFile) {
         const presign = await api.presignUpload(mediaFile.name, mediaFile.type);
@@ -62,17 +66,27 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
           finalMediaUrl = res.publicUrl;
         }
       }
+      if (musicFile) {
+        const uploadedMusic = await api.uploadLocal(musicFile);
+        finalMusicUrl = uploadedMusic.publicUrl;
+      }
 
       await api.createPost({
         content: content.trim() || undefined,
         mediaUrl: finalMediaUrl,
         mediaType: mediaType || undefined,
         visibility,
+        musicUrl: finalMusicUrl,
+        musicType: finalMusicUrl ? 'audio' : undefined,
       });
 
       setContent('');
       setMediaUrl('');
       setMediaType('');
+      setMusicUrl('');
+      setMusicFile(null);
+      if (musicPreviewUrl) URL.revokeObjectURL(musicPreviewUrl);
+      setMusicPreviewUrl(null);
       setMediaFile(null);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
@@ -117,7 +131,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
             </label>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {[
-                { id: 'TREE', name: 'Tree' },
+                { id: 'TREE', name: 'Public' },
                 { id: 'FOLLOWERS', name: 'Followers' },
                 { id: 'CIRCLE', name: 'Circle' },
               ].map((c) => (
@@ -132,6 +146,13 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
                 </button>
               ))}
             </div>
+          </div>
+
+          <div style={{ marginBottom: '18px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--zq-text-muted)', marginBottom: '6px', textTransform: 'uppercase' }}>Music / Audio (Optional)</label>
+            <input className="zq-settings-input" placeholder="Paste music URL (MP3, WAV, OGG)" value={musicUrl} onChange={(e) => setMusicUrl(e.target.value)} />
+            <input type="file" accept="audio/*" onChange={(e) => { const file = e.target.files?.[0]; if (!file) return; setMusicFile(file); if (musicPreviewUrl) URL.revokeObjectURL(musicPreviewUrl); setMusicPreviewUrl(URL.createObjectURL(file)); }} style={{ marginTop: '8px', width: '100%' }} />
+            {(musicPreviewUrl || musicUrl) && <audio controls src={musicPreviewUrl || musicUrl} style={{ width: '100%', marginTop: '8px' }} />}
           </div>
 
           {/* Media Preview or Dropzone */}

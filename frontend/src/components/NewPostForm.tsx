@@ -8,6 +8,8 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaType, setMediaType] = useState<'image' | 'video' | ''>('');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const [musicUrl, setMusicUrl] = useState('');
+  const [musicFile, setMusicFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showLive, setShowLive] = useState(false);
@@ -20,6 +22,7 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
     setError('');
     try {
       let finalMediaUrl = mediaUrl || undefined;
+      let finalMusicUrl = musicUrl || undefined;
       if (mediaFile) {
         const presign = await api.presignUpload(mediaFile.name, mediaFile.type);
         if (presign.method === 'PUT') {
@@ -30,13 +33,16 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
           finalMediaUrl = res.publicUrl;
         }
       }
+      if (musicFile) finalMusicUrl = (await api.uploadLocal(musicFile)).publicUrl;
 
-      await api.createPost({ content: content || undefined, mediaUrl: finalMediaUrl || undefined, mediaType: mediaType || undefined, visibility: 'TREE' });
+      await api.createPost({ content: content || undefined, mediaUrl: finalMediaUrl || undefined, mediaType: mediaType || undefined, musicUrl: finalMusicUrl || undefined, musicType: finalMusicUrl ? 'audio' : undefined, visibility: 'TREE' });
       setContent('');
       if (mediaUrl.startsWith('blob:')) URL.revokeObjectURL(mediaUrl);
       setMediaUrl('');
       setMediaType('');
       setMediaFile(null);
+      setMusicUrl('');
+      setMusicFile(null);
       onPosted();
     } catch (err: any) {
       setError(err.message);
@@ -88,6 +94,10 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
           <option value="image">🖼️ Image</option>
           <option value="video">🎥 Video</option>
         </select>
+        <label style={{ display: 'block', marginTop: 10 }}>Music / audio (optional)
+          <input type="url" placeholder="Paste music URL" value={musicUrl} onChange={(e) => setMusicUrl(e.target.value)} />
+          <input type="file" accept="audio/*" onChange={(e) => setMusicFile(e.target.files?.[0] || null)} />
+        </label>
       </div>
 
       {mediaUrl && mediaType === 'image' && (

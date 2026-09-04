@@ -115,6 +115,8 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
           )}
         </div>
 
+        {post.musicUrl && <audio className="zq-detail-music" controls preload="metadata" src={resolveMediaUrl(post.musicUrl)} />}
+
         {/* Info & Comments Column */}
         <div className="ig-lightbox-info-col">
           {/* Header */}
