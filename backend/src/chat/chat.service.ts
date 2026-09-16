@@ -1,14 +1,18 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { buildCursorPageArgs } from '../common/pagination';
 
 @Injectable()
 export class ChatService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getConversations(userId: string) {
+  async getConversations(userId: string, cursor?: string, limit = 20) {
+    const page = buildCursorPageArgs({ cursor, limit, maxLimit: 50 });
+
     const conversations = await (this.prisma as any).conversation.findMany({
       where: { participants: { some: { userId } } },
       orderBy: { createdAt: 'desc' },
+      ...page,
       include: {
         participants: {
           where: { userId: { not: userId } },
@@ -17,15 +21,19 @@ export class ChatService {
         messages: { orderBy: { createdAt: 'desc' }, take: 1, select: { content: true, createdAt: true, senderId: true } },
       },
     });
-    return conversations
-      .map((conversation: any) => ({
-        id: conversation.id,
-        status: conversation.status,
-        requesterId: conversation.requesterId,
-        lastMessage: conversation.messages[0] || null,
-        user: conversation.participants[0]?.user || null,
-      }))
-      .filter((conversation: any) => conversation.user);
+
+    return {
+      conversations: conversations
+        .map((conversation: any) => ({
+          id: conversation.id,
+          status: conversation.status,
+          requesterId: conversation.requesterId,
+          lastMessage: conversation.messages[0] || null,
+          user: conversation.participants[0]?.user || null,
+        }))
+        .filter((conversation: any) => conversation.user),
+      nextCursor: conversations.length === page.take ? conversations[conversations.length - 1].id : null,
+    };
   }
 
   async getOrCreateConversation(userAId: string, userBUsername: string) {
@@ -90,9 +98,14 @@ export class ChatService {
     await this.ensureParticipant(conversationId, viewerId);
     return (this.prisma as any).message.findMany({
       where: { conversationId },
-      orderBy: { createdAt: 'asc' },
-      include: { sender: true },
-    });
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      include: {
+        sender: {
+          select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true },
+        },
+      },
+    }).then((messages: any[]) => messages.reverse());
   }
 
   private async ensureParticipant(conversationId: string, userId: string) {

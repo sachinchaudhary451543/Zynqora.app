@@ -44,11 +44,15 @@ export class RealtimeGateway {
 
   @SubscribeMessage('call:invite')
   invite(@ConnectedSocket() socket: Socket, @MessageBody() body: { targetUserId: string; callId: string; callType: 'audio' | 'video' }) {
+    if (!socket.data.userId || body.targetUserId === socket.data.userId) {
+      throw new Error('Unauthorized call invite');
+    }
     this.emitToUser(body.targetUserId, 'call:incoming', { ...body, fromUserId: socket.data.userId });
   }
 
   @SubscribeMessage('call:signal')
   signal(@ConnectedSocket() socket: Socket, @MessageBody() body: SignalPayload) {
+    if (!socket.data.userId) throw new Error('Unauthorized call signal');
     const queued = this.pendingSignals.get(body.callId) || [];
     queued.push({ fromUserId: socket.data.userId, signal: body.signal });
     this.pendingSignals.set(body.callId, queued.slice(-10));
@@ -57,19 +61,26 @@ export class RealtimeGateway {
 
   @SubscribeMessage('call:join')
   join(@ConnectedSocket() socket: Socket, @MessageBody() body: { callId: string; targetUserId: string }) {
-    for (const queued of this.pendingSignals.get(body.callId) || []) {
-      socket.emit('call:signal', { callId: body.callId, fromUserId: queued.fromUserId, targetUserId: socket.data.userId, signal: queued.signal });
+    if (!socket.data.userId) throw new Error('Unauthorized call join');
+    if (body.targetUserId !== socket.data.userId && body.targetUserId !== undefined) {
+      throw new Error('Unauthorized call join');
+    }
+    const queued = this.pendingSignals.get(body.callId) || [];
+    for (const item of queued) {
+      socket.emit('call:signal', { callId: body.callId, fromUserId: item.fromUserId, targetUserId: socket.data.userId, signal: item.signal });
     }
   }
 
   @SubscribeMessage('call:end')
   end(@ConnectedSocket() socket: Socket, @MessageBody() body: { targetUserId: string; callId: string }) {
+    if (!socket.data.userId) throw new Error('Unauthorized call end');
     this.emitToUser(body.targetUserId, 'call:ended', { ...body, fromUserId: socket.data.userId });
     this.pendingSignals.delete(body.callId);
   }
 
   @SubscribeMessage('live:start')
   startLive(@ConnectedSocket() socket: Socket, @MessageBody() body: { title?: string }) {
+    if (!socket.data.userId) throw new Error('Unauthorized live start');
     const room: LiveRoom = { broadcasterId: socket.data.userId, title: (body.title || 'Live Aura').trim().slice(0, 80), startedAt: new Date().toISOString() };
     this.liveRooms.set(room.broadcasterId, room);
     this.server.emit('live:list', Array.from(this.liveRooms.values()));
@@ -78,18 +89,24 @@ export class RealtimeGateway {
 
   @SubscribeMessage('live:join')
   joinLive(@ConnectedSocket() socket: Socket, @MessageBody() body: { broadcasterId: string }) {
-    if (body.broadcasterId === socket.data.userId || !this.liveRooms.has(body.broadcasterId)) return;
+    if (!socket.data.userId) throw new Error('Unauthorized live join');
+    const room = this.liveRooms.get(body.broadcasterId);
+    if (!room || room.broadcasterId === socket.data.userId) {
+      return;
+    }
     socket.join(`live:${body.broadcasterId}`);
     this.emitToUser(body.broadcasterId, 'live:viewer-joined', { viewerId: socket.data.userId });
   }
 
   @SubscribeMessage('live:signal')
   liveSignal(@ConnectedSocket() socket: Socket, @MessageBody() body: { targetUserId: string; signal: unknown }) {
+    if (!socket.data.userId) throw new Error('Unauthorized live signal');
     this.emitToUser(body.targetUserId, 'live:signal', { fromUserId: socket.data.userId, signal: body.signal });
   }
 
   @SubscribeMessage('live:stop')
   stopLive(@ConnectedSocket() socket: Socket) {
+    if (!socket.data.userId) throw new Error('Unauthorized live stop');
     if (!this.liveRooms.delete(socket.data.userId)) return;
     this.server.emit('live:ended', { broadcasterId: socket.data.userId });
     this.server.emit('live:list', Array.from(this.liveRooms.values()));

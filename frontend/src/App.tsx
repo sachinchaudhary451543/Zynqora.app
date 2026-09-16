@@ -11,6 +11,7 @@ const SettingsPage = React.lazy(() => import('./pages/Settings'));
 const ChatPage = React.lazy(() => import('./pages/Chat'));
 const FollowersPage = React.lazy(() => import('./pages/Followers'));
 const FollowingPage = React.lazy(() => import('./pages/Following'));
+const AuraPage = React.lazy(() => import('./pages/AuraPage'));
 import Sidebar from './components/Sidebar';
 import FloatingMessagesWidget from './components/FloatingMessagesWidget';
 import CreatePostModal from './components/CreatePostModal';
@@ -77,6 +78,18 @@ export default function App() {
                 <CirclesHub />
               </ProtectedRoute>
             }
+          />
+          <Route
+            path="/aura"
+            element={
+              <ProtectedRoute>
+                <AuraPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/stories"
+            element={<Navigate to="/aura" replace />}
           />
           <Route
             path="/profile/:username"

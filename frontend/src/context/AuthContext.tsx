@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { api, User } from '../api/client';
+import { removeNativePushToken, syncNativePushToken } from '../mobile';
 
 interface AuthContextValue {
   user: User | null;
@@ -19,6 +20,7 @@ function readStoredUser() {
   } catch {
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     return null;
   }
 }
@@ -26,8 +28,13 @@ function readStoredUser() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(readStoredUser);
 
-  const persist = (token: string, user: User) => {
+  useEffect(() => {
+    if (user) void syncNativePushToken();
+  }, [user]);
+
+  const persist = (token: string, user: User, refreshToken?: string) => {
     localStorage.setItem('token', token);
+    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('user', JSON.stringify(user));
     setUser(user);
   };
@@ -40,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const res = await api.login({ email, password });
-    persist(res.token, res.user);
+    persist(res.token, res.user, res.refreshToken);
   }, []);
 
   const signup = useCallback(
@@ -50,14 +57,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('pendingRecoveryCode', res.recoveryCode);
         window.dispatchEvent(new Event('recovery-code-created'));
       }
-      persist(res.token, res.user);
+      persist(res.token, res.user, res.refreshToken);
       return res.recoveryCode;
     },
     [],
   );
 
   const logout = useCallback(() => {
+    void removeNativePushToken();
+    const token = localStorage.getItem('token');
+    if (token) {
+      api.logout().catch(() => undefined);
+    }
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     setUser(null);
   }, []);
