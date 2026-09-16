@@ -7,9 +7,14 @@ import { LoginDto } from './dto/login.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
 const SALT_ROUNDS = 12;
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 async function hashPassword(password: string) {
   return bcrypt.hash(password, SALT_ROUNDS);
+}
+
+function hashToken(token: string) {
+  return createHash('sha256').update(token).digest('hex');
 }
 
 async function comparePassword(password: string, storedHash: string): Promise<boolean> {
@@ -56,7 +61,8 @@ export class AuthService {
       },
     });
 
-    return { ...this.buildAuthResponse(user), recoveryCode };
+    const session = await this.issueSession(user);
+    return { ...session, recoveryCode };
   }
 
   async checkUsername(username: string) {
@@ -86,8 +92,59 @@ export class AuthService {
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const user = await this.prisma.user.findFirst({ where: { resetToken: tokenHash, resetTokenExpiresAt: { gt: new Date() } } });
     if (!user) throw new UnauthorizedException('Invalid or expired recovery request');
-    await this.prisma.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password), resetToken: null, resetTokenExpiresAt: null } });
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await hashPassword(password),
+        resetToken: null,
+        resetTokenExpiresAt: null,
+        refreshTokenHash: null,
+        refreshTokenExpiresAt: null,
+        tokenVersion: { increment: 1 },
+      },
+    });
     return { message: 'Password reset successfully. You can now log in.' };
+  }
+
+  async logout(userId: string) {
+    if (!userId) throw new UnauthorizedException('Invalid session');
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        refreshTokenHash: null,
+        refreshTokenExpiresAt: null,
+        tokenVersion: { increment: 1 },
+      },
+    });
+    return { message: 'Logged out successfully.' };
+  }
+
+  async refreshSession(refreshToken: string) {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Invalid session');
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        refreshTokenHash: hashToken(refreshToken),
+        refreshTokenExpiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Session expired');
+    }
+
+    const nextRefreshToken = randomBytes(32).toString('hex');
+    const refreshedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshTokenHash: hashToken(nextRefreshToken),
+        refreshTokenExpiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+      },
+    });
+
+    return { ...this.buildAuthResponse(refreshedUser), refreshToken: nextRefreshToken };
   }
 
   async login(dto: LoginDto) {
@@ -115,11 +172,28 @@ export class AuthService {
       });
     }
 
-    return this.buildAuthResponse(user);
+    return this.issueSession(user);
   }
 
-  private buildAuthResponse(user: { id: string; email: string; username: string; name: string; avatarUrl: string | null }) {
-    const token = this.jwt.sign({ sub: user.id, username: user.username });
+  private async issueSession(user: { id: string; email: string; username: string; name: string; avatarUrl: string | null; tokenVersion: number }) {
+    const refreshToken = randomBytes(32).toString('hex');
+    const refreshTokenHash = hashToken(refreshToken);
+    const refreshedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        refreshTokenHash,
+        refreshTokenExpiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+      },
+    });
+
+    return {
+      ...this.buildAuthResponse(refreshedUser),
+      refreshToken,
+    };
+  }
+
+  private buildAuthResponse(user: { id: string; email: string; username: string; name: string; avatarUrl: string | null; tokenVersion: number }) {
+    const token = this.jwt.sign({ sub: user.id, username: user.username, tokenVersion: user.tokenVersion });
     return {
       token,
       user: {

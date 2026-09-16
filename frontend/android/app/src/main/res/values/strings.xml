@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ZYNQORA</string>
+    <string name="title_activity_main">ZYNQORA</string>
+    <string name="package_name">com.zynqora.app</string>
+    <string name="custom_url_scheme">com.zynqora.app</string>
+</resources>

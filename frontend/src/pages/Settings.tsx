@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { api, getAvatarUrl } from '../api/client';
 import AvatarActionsModal from '../components/AvatarActionsModal';
 import ImageEditor from '../components/ImageEditor';
+import { COMMUNITY_CIRCLES } from '../data/communityCircles';
 import {
   SearchIcon,
   ShieldLockIcon,
@@ -20,7 +21,7 @@ type TabKey =
   | 'security-keys';
 
 export default function SettingsPage() {
-  const { user, setUserState } = useAuth();
+  const { user, logout, setUserState } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>('aura-profile');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -47,6 +48,7 @@ export default function SettingsPage() {
   });
 
   const [saving, setSaving] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -124,6 +126,20 @@ export default function SettingsPage() {
       setErrorMsg(err.message || 'Failed to upload image');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm('Delete your account and all of its posts, stories, comments, and likes? This cannot be undone.')) return;
+    setDeletingAccount(true);
+    setErrorMsg('');
+    try {
+      await api.deleteAccount();
+      logout();
+      window.location.href = '/login';
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to delete account');
+      setDeletingAccount(false);
     }
   };
 
@@ -332,6 +348,16 @@ export default function SettingsPage() {
             <button type="submit" className="zq-btn-aura" disabled={saving} style={{ padding: '12px 32px' }}>
               {saving ? 'Synchronizing...' : 'Save Aura Settings'}
             </button>
+
+            <div style={{ marginTop: '40px', paddingTop: '24px', borderTop: '1px solid rgba(255, 51, 102, 0.3)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--zq-danger)', marginBottom: '6px' }}>Delete account</h3>
+              <p style={{ color: 'var(--zq-text-secondary)', fontSize: '13px', marginBottom: '14px' }}>
+                Permanently remove your account and its content from Zynqora.
+              </p>
+              <button type="button" className="zq-btn-glass" onClick={handleDeleteAccount} disabled={deletingAccount} style={{ color: 'var(--zq-danger)', borderColor: 'rgba(255, 51, 102, 0.45)' }}>
+                {deletingAccount ? 'Deleting account...' : 'Delete my account'}
+              </button>
+            </div>
           </form>
         )}
 
@@ -372,13 +398,9 @@ export default function SettingsPage() {
               Manage memberships and permissions across your community circles.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {[
-                { name: '🚀 Tech Innovators', role: 'Owner / Creator', members: '5.4k' },
-                { name: '🏡 Family Sanctuary', role: 'Admin', members: '12' },
-                { name: '🎨 Creative Studio', role: 'Active Member', members: '3.8k' },
-              ].map((c, i) => (
+              {COMMUNITY_CIRCLES.filter((circle) => circle.id !== 'all').map((c) => (
                 <div
-                  key={i}
+                  key={c.id}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -391,7 +413,7 @@ export default function SettingsPage() {
                 >
                   <div>
                     <div style={{ fontWeight: 800, color: '#fff', fontSize: '15px' }}>{c.name}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--zq-text-secondary)' }}>{c.members} members • {c.role}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--zq-text-secondary)' }}>{c.count !== undefined ? `${c.count.toLocaleString()} members` : 'Community circle'} • {c.role || 'Member'}</div>
                   </div>
                   <button className="zq-btn-glass" style={{ fontSize: '12px' }}>
                     Configure

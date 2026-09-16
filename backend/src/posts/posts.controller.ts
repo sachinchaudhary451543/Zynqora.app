@@ -15,13 +15,22 @@ export class PostsController {
   }
 
   @Get('feed')
-  getFeed(@CurrentUser() user: { userId: string }, @Query('cursor') cursor?: string) {
-    return this.postsService.getFeed(user.userId, cursor);
+  getFeed(
+    @CurrentUser() user: { userId: string },
+    @Query('cursor') cursor?: string,
+    @Query('circle') circle?: string,
+  ) {
+    return this.postsService.getFeed(user.userId, cursor, 20, circle);
   }
 
   @Get('user/:username')
-  getUserPosts(@CurrentUser() user: { userId: string }, @Param('username') username: string) {
-    return this.postsService.getUserPosts(username, user.userId);
+  getUserPosts(
+    @CurrentUser() user: { userId: string },
+    @Param('username') username: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.postsService.getUserPosts(username, user.userId, cursor, Number(limit) || 20);
   }
 
   @Delete(':postId')

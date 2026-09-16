@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import Hls from 'hls.js';
 import { Link } from 'react-router-dom';
 import { Post, api, getAvatarUrl, getDefaultAvatar, resolveMediaUrl } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { HlsVideo } from './HlsVideo';
 import CommentsSection from './CommentsSection';
 import {
   NotificationsIcon,
@@ -12,35 +12,6 @@ import {
   MoreDotsIcon,
   AuraSparkIcon,
 } from './Icons';
-
-export function HlsVideo({ src, onError, className, style }: { src: string; onError: () => void; className?: string; style?: React.CSSProperties }) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = src;
-      return;
-    }
-
-    if (!Hls.isSupported()) {
-      onError();
-      return;
-    }
-
-    const hls = new Hls({ enableWorker: true });
-    hls.loadSource(src);
-    hls.attachMedia(video);
-    hls.on(Hls.Events.ERROR, (_event, data) => {
-      if (data.fatal) onError();
-    });
-    return () => hls.destroy();
-  }, [src, onError]);
-
-  return <video ref={videoRef} className={className} style={style} controls playsInline onError={onError} />;
-}
 
 export default function PostCard({ post }: { post: Post }) {
   const { user } = useAuth();
@@ -52,6 +23,11 @@ export default function PostCard({ post }: { post: Post }) {
   const [commentCount, setCommentCount] = useState(post._count?.comments || 0);
   const [mediaFailed, setMediaFailed] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const soundRef = useRef<HTMLAudioElement | null>(null);
+  const cardRef = useRef<HTMLElement | null>(null);
+  const playbackHintTimer = useRef<number | undefined>(undefined);
+  const [showPlaybackHint, setShowPlaybackHint] = useState(false);
+  const [soundPlaying, setSoundPlaying] = useState(false);
 
   const authorAvatar =
     post.author.username === user?.username
@@ -98,6 +74,149 @@ export default function PostCard({ post }: { post: Post }) {
     handleLikeToggle();
   };
 
+  const isManuallyPausedRef = useRef<boolean>(false);
+  const isMusicPausedByUserRef = useRef<boolean>(false);
+
+  const toggleMediaPlayback = () => {
+    const media = soundRef.current;
+    const card = cardRef.current;
+    const video = card ? (card.querySelector('video') as HTMLVideoElement | null) : null;
+    
+    const isPlaying = (video && !video.paused) || (media && !media.paused) || soundPlaying;
+
+    if (isPlaying) {
+      // User explicitly paused playback
+      isManuallyPausedRef.current = true;
+      isMusicPausedByUserRef.current = true;
+      if (video && !video.paused) video.pause();
+      if (media && !media.paused) {
+        media.pause();
+        setSoundPlaying(false);
+      }
+    } else {
+      // User explicitly resumed playback
+      isManuallyPausedRef.current = false;
+      isMusicPausedByUserRef.current = false;
+      if (video && video.paused) video.play().catch(() => {});
+      if (media && media.paused) {
+        media.play().then(() => {
+          setSoundPlaying(true);
+          window.dispatchEvent(new CustomEvent('zq-sound-started', { detail: { postId: post.id } }));
+        }).catch(() => {});
+      }
+    }
+
+    setShowPlaybackHint(true);
+    window.clearTimeout(playbackHintTimer.current);
+    playbackHintTimer.current = window.setTimeout(() => setShowPlaybackHint(false), 2000);
+  };
+
+  const toggleSoundOnly = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const media = soundRef.current;
+    const card = cardRef.current;
+    const video = card ? (card.querySelector('video') as HTMLVideoElement | null) : null;
+
+    if (soundPlaying || (media && !media.paused)) {
+      // User explicitly paused/muted sound
+      isMusicPausedByUserRef.current = true;
+      if (media) media.pause();
+      if (video) video.muted = true;
+      setSoundPlaying(false);
+    } else {
+      // User explicitly unmuted/played sound
+      isMusicPausedByUserRef.current = false;
+      isManuallyPausedRef.current = false;
+      if (video) video.muted = false;
+      if (media) {
+        media.play().then(() => {
+          setSoundPlaying(true);
+          window.dispatchEvent(new CustomEvent('zq-sound-started', { detail: { postId: post.id } }));
+        }).catch(() => {});
+      } else {
+        setSoundPlaying(true);
+      }
+    }
+
+    setShowPlaybackHint(true);
+    window.clearTimeout(playbackHintTimer.current);
+    playbackHintTimer.current = window.setTimeout(() => setShowPlaybackHint(false), 2000);
+  };
+
+  const getYouTubeEmbedUrl = (url?: string | null) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[2].length === 11) {
+      return `https://www.youtube.com/embed/${match[2]}`;
+    }
+    return null;
+  };
+
+  const ytEmbedUrl = getYouTubeEmbedUrl(post.mediaUrl);
+  const isVideo = post.mediaType === 'video' || Boolean(post.mediaUrl && /\.(mp4|webm|mov|m4v|m3u8)(?:[?#].*)?$/i.test(post.mediaUrl));
+
+  // ─── Scroll-based play / pause via IntersectionObserver ──────────────────
+  // Play audio + video only when ≥60% of the card is visible in the viewport.
+  // RESPECTS user's manual pause choice: if user paused it, scrolling back into view WILL NOT auto-play.
+  useEffect(() => {
+    if (!post.musicUrl && !isVideo) return; // nothing to auto-control
+    const card = cardRef.current;
+    if (!card) return;
+
+    // Listen for other posts starting sound so multiple tracks never clash
+    const handleOtherSoundStarted = (e: Event) => {
+      const otherPostId = (e as CustomEvent).detail?.postId;
+      if (otherPostId && otherPostId !== post.id) {
+        const audio = soundRef.current;
+        if (audio && !audio.paused) {
+          audio.pause();
+          setSoundPlaying(false);
+        }
+      }
+    };
+    window.addEventListener('zq-sound-started', handleOtherSoundStarted);
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const audio = soundRef.current;
+        const video = card.querySelector('video') as HTMLVideoElement | null;
+
+        if (entry.isIntersecting) {
+          // In view: ONLY auto-play if user did NOT explicitly pause it!
+          if (!isManuallyPausedRef.current) {
+            if (video && video.paused) video.play().catch(() => {});
+          }
+          if (!isMusicPausedByUserRef.current && !isManuallyPausedRef.current) {
+            if (audio && audio.paused) {
+              audio.play().then(() => {
+                setSoundPlaying(true);
+                window.dispatchEvent(new CustomEvent('zq-sound-started', { detail: { postId: post.id } }));
+              }).catch(() => {});
+            }
+          }
+        } else {
+          // Out of view: pause to prevent background audio and save resources.
+          // IMPORTANT: Do NOT alter isManuallyPausedRef or isMusicPausedByUserRef here,
+          // as this is an automated scroll-pause, not a user pause action.
+          if (video && !video.paused) video.pause();
+          if (audio && !audio.paused) {
+            audio.pause();
+            setSoundPlaying(false);
+          }
+        }
+      },
+      { threshold: 0.6 },
+    );
+
+    observer.observe(card);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('zq-sound-started', handleOtherSoundStarted);
+      window.clearTimeout(playbackHintTimer.current);
+    };
+  }, [post.musicUrl, isVideo, post.id]);
+
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
@@ -124,26 +243,13 @@ export default function PostCard({ post }: { post: Post }) {
     }
   };
 
-  const getYouTubeEmbedUrl = (url?: string | null) => {
-    if (!url) return null;
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    if (match && match[2].length === 11) {
-      return `https://www.youtube.com/embed/${match[2]}`;
-    }
-    return null;
-  };
-
-  const ytEmbedUrl = getYouTubeEmbedUrl(post.mediaUrl);
-  const isVideo = post.mediaType === 'video' || Boolean(post.mediaUrl && /\.(mp4|webm|mov|m4v|m3u8)(?:[?#].*)?$/i.test(post.mediaUrl));
-
-  // Circle Badge determined by post content or author
-  const circleBadge = post.content?.toLowerCase().includes('code') || post.content?.toLowerCase().includes('app')
-    ? '🚀 Tech Innovators'
+  // Circle Badge determined by database circle relation or default to Global Sync
+  const circleBadge = post.circle
+    ? `${post.circle.icon ? post.circle.icon + ' ' : ''}${post.circle.name}`
     : '🌍 Global Sync';
 
   return (
-    <article className="zq-post-card">
+    <article className="zq-post-card" ref={cardRef}>
       {/* Header with Circle Tag */}
       <div className="zq-post-header">
         <div className="zq-post-author-row">
@@ -186,7 +292,7 @@ export default function PostCard({ post }: { post: Post }) {
 
       {/* Post Media */}
       {post.mediaUrl && !mediaFailed && (
-        <div className="zq-post-media-wrap" onDoubleClick={handleDoubleTap}>
+        <div className="zq-post-media-wrap" data-post-media={post.id} onClick={toggleMediaPlayback} onDoubleClick={handleDoubleTap} role="button" tabIndex={0} aria-label="Play or pause post media">
           {ytEmbedUrl ? (
             <iframe
               src={ytEmbedUrl}
@@ -206,7 +312,7 @@ export default function PostCard({ post }: { post: Post }) {
             /\.m3u8(?:[?#].*)?$/i.test(post.mediaUrl) ? (
               <HlsVideo src={resolveMediaUrl(post.mediaUrl)} onError={() => setMediaFailed(true)} />
             ) : (
-              <video src={resolveMediaUrl(post.mediaUrl)} controls playsInline onError={() => setMediaFailed(true)} />
+              <video src={resolveMediaUrl(post.mediaUrl)} playsInline muted={Boolean(post.musicUrl)} onError={() => setMediaFailed(true)} />
             )
           ) : (
             <img src={resolveMediaUrl(post.mediaUrl)} alt="Sync media" onError={() => setMediaFailed(true)} />
@@ -229,6 +335,43 @@ export default function PostCard({ post }: { post: Post }) {
               {reactionType || '⚡'}
             </div>
           )}
+          {/* Floating Sound Toggle Pill */}
+          {(post.musicUrl || isVideo) && (
+            <button
+              type="button"
+              onClick={toggleSoundOnly}
+              className="zq-media-sound-btn"
+              title={soundPlaying ? 'Pause / Mute audio' : 'Play / Unmute audio'}
+              style={{
+                position: 'absolute',
+                bottom: '12px',
+                right: '12px',
+                zIndex: 6,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 12px',
+                borderRadius: '16px',
+                background: 'rgba(5, 8, 18, 0.78)',
+                border: soundPlaying ? '1px solid rgba(0, 223, 216, 0.6)' : '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                color: soundPlaying ? '#00dfd8' : 'rgba(255, 255, 255, 0.75)',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: soundPlaying ? '0 0 14px rgba(0, 223, 216, 0.35)' : '0 2px 8px rgba(0, 0, 0, 0.5)',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span style={{ fontSize: '12px' }}>{soundPlaying ? '🔊' : '🔇'}</span>
+              <span>{post.musicUrl ? (soundPlaying ? 'Music Playing' : 'Music Paused') : (soundPlaying ? 'Audio On' : 'Muted')}</span>
+            </button>
+          )}
+
+          {post.musicUrl && showPlaybackHint && (
+            <div className="zq-media-playback-hint" aria-hidden="true">{soundPlaying ? '❚❚' : '▶'}</div>
+          )}
         </div>
       )}
       {post.mediaUrl && mediaFailed && (
@@ -237,10 +380,7 @@ export default function PostCard({ post }: { post: Post }) {
         </div>
       )}
       {post.musicUrl && (
-        <div className="zq-post-music">
-          <span>Music</span>
-          <audio controls preload="metadata" src={resolveMediaUrl(post.musicUrl)} />
-        </div>
+        <audio ref={soundRef} className="zq-post-sound" preload="auto" src={resolveMediaUrl(post.musicUrl)} aria-label="Post sound" />
       )}
 
       {/* Actions & Aura Reaction Bar */}

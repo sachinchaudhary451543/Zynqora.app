@@ -54,11 +54,22 @@ export default function Explore() {
     { id: 'family', name: '🏡 Family Spaces' },
   ];
 
-  const filtered = suggestions.filter(
-    (u) =>
-      u.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = suggestions.filter((u) => {
+    const query = searchQuery.toLowerCase().trim();
+    const searchable = `${u.username} ${u.name} ${u.bio || ''} ${u.category || ''} ${u.note || ''}`.toLowerCase();
+    const matchesSearch = !query || searchable.includes(query);
+    if (!matchesSearch) return false;
+    if (activeCategory === 'all') return true;
+    const categoryText = `${u.category || ''} ${u.bio || ''} ${u.note || ''} ${u.name}`.toLowerCase();
+    const keywords: Record<string, string[]> = {
+      tech: ['tech', 'ai', 'software', 'developer', 'code', 'engineer'],
+      creators: ['artist', 'creative', 'design', 'photo', 'visual', 'creator'],
+      gaming: ['game', 'gaming', 'streamer', 'esports'],
+      music: ['music', 'audio', 'sound', 'singer', 'song', 'voice'],
+      family: ['family', 'parent', 'home', 'community'],
+    };
+    return keywords[activeCategory]?.some((keyword) => categoryText.includes(keyword)) ?? true;
+  });
 
   return (
     <div style={{ maxWidth: '1000px', margin: '28px auto 80px auto', padding: '0 20px', width: '100%' }}>
@@ -80,6 +91,7 @@ export default function Explore() {
       <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '12px', marginBottom: '28px', scrollbarWidth: 'none' }}>
         {categories.map((cat) => (
           <button
+            type="button"
             key={cat.id}
             className={`zq-circle-pill ${activeCategory === cat.id ? 'active' : ''}`}
             onClick={() => setActiveCategory(cat.id)}

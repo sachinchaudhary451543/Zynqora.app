@@ -8,6 +8,7 @@ import {
   normalizePostVisibility,
   visibleContentWhere,
 } from '../common/social-access';
+import { buildCursorPageArgs } from '../common/pagination';
 
 @Injectable()
 export class PostsService {
@@ -16,6 +17,22 @@ export class PostsService {
   async create(authorId: string, dto: CreatePostDto) {
     if (!dto.content && !dto.mediaUrl) {
       throw new BadRequestException('Post needs content or media');
+    }
+
+    let resolvedCircleId: string | null = null;
+    if (dto.circleId && dto.circleId !== 'all' && dto.circleId !== 'global') {
+      const circle = await this.prisma.circle.findFirst({
+        where: {
+          OR: [
+            { id: dto.circleId },
+            { slug: dto.circleId },
+          ],
+        },
+        select: { id: true },
+      });
+      if (circle) {
+        resolvedCircleId = circle.id;
+      }
     }
 
     return this.prisma.post.create({
@@ -27,9 +44,11 @@ export class PostsService {
         musicUrl: dto.musicUrl,
         musicType: dto.musicType,
         visibility: normalizePostVisibility(dto.visibility),
+        circleId: resolvedCircleId,
       },
       include: {
         author: { select: authorSelect },
+        circle: { select: { id: true, slug: true, name: true, icon: true } },
         _count: { select: { likes: true, comments: true } },
       },
     });
@@ -37,39 +56,66 @@ export class PostsService {
 
   // Feed = posts from people the current user follows, plus their own posts,
   // filtered so FOLLOWERS-only posts require the author to also follow back.
-  async getFeed(userId: string, cursor?: string, limit = 20) {
+  async getFeed(userId: string, cursor?: string, limit = 20, circle?: string) {
     const { followingIds, mutualIds } = await getFollowSets(this.prisma, userId);
+    const page = buildCursorPageArgs({ cursor, limit, maxLimit: 50 });
+
+    const baseWhere = visibleContentWhere(userId, followingIds, mutualIds);
+    let where: any = baseWhere;
+
+    if (circle && circle !== 'all') {
+      where = {
+        AND: [
+          baseWhere,
+          {
+            OR: [
+              { circleId: circle },
+              { circle: { slug: circle } },
+            ],
+          },
+        ],
+      };
+    }
 
     const posts = await this.prisma.post.findMany({
-      where: visibleContentWhere(userId, followingIds, mutualIds),
+      where,
       orderBy: { createdAt: 'desc' },
-      take: limit,
-      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      ...page,
       include: {
         author: { select: authorSelect },
+        circle: { select: { id: true, slug: true, name: true, icon: true } },
         _count: { select: { likes: true, comments: true } },
       },
     });
 
     return {
       posts,
-      nextCursor: posts.length === limit ? posts[posts.length - 1].id : null,
+      nextCursor: posts.length === page.take ? posts[posts.length - 1].id : null,
     };
   }
 
-  async getUserPosts(username: string, viewerId: string) {
+  async getUserPosts(username: string, viewerId: string, cursor?: string, limit = 20) {
     const { followingIds, mutualIds } = await getFollowSets(this.prisma, viewerId);
-    return this.prisma.post.findMany({
+    const page = buildCursorPageArgs({ cursor, limit, maxLimit: 50 });
+
+    const posts = await this.prisma.post.findMany({
       where: {
         author: { username },
         ...visibleContentWhere(viewerId, followingIds, mutualIds),
       },
       orderBy: { createdAt: 'desc' },
+      ...page,
       include: {
         author: { select: authorSelect },
+        circle: { select: { id: true, slug: true, name: true, icon: true } },
         _count: { select: { likes: true, comments: true } },
       },
     });
+
+    return {
+      posts,
+      nextCursor: posts.length === page.take ? posts[posts.length - 1].id : null,
+    };
   }
 
   async delete(userId: string, postId: string) {

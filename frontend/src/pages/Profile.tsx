@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, Post, getAvatarUrl, getDefaultAvatar, normalizeConnectionUsers } from '../api/client';
+import { api, Post, getAvatarUrl, getDefaultAvatar, normalizeConnectionUsers, resolveMediaUrl } from '../api/client';
 import PostCard from '../components/PostCard';
 import { useAuth } from '../context/AuthContext';
 
-import StoryRecorder from '../components/StoryRecorder';
-import StoryViewerModal from '../components/StoryViewerModal';
+const StoryRecorder = React.lazy(() => import('../components/StoryRecorder'));
+const StoryViewerModal = React.lazy(() => import('../components/StoryViewerModal'));
 import ImageEditor from '../components/ImageEditor';
 import AvatarActionsModal from '../components/AvatarActionsModal';
 import FollowersModal from '../components/FollowersModal';
@@ -31,6 +31,7 @@ export default function Profile() {
   const [showEditor, setShowEditor] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showAiStudio, setShowAiStudio] = useState(false);
+  const [showStoryModal, setShowStoryModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts'|'circles'|'aura'>('posts');
   const [moments, setMoments] = useState<any[]>([]);
   const [viewingMoment, setViewingMoment] = useState<any | null>(null);
@@ -748,25 +749,95 @@ export default function Profile() {
         )}
 
         {activeTab === 'circles' && (
-          <div style={{ maxWidth: '520px', margin: '0 auto', background: 'var(--zq-surface-card)', padding: '24px', borderRadius: '24px', border: '1px solid var(--zq-glass-border)', boxShadow: '0 12px 36px rgba(0,0,0,0.3)' }}>
-            {isOwnProfile && <div style={{ marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '20px' }}>⚡</span>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#fff' }}>Publish Aura Moment / Status</h3>
-                <div style={{ fontSize: '12px', color: 'var(--zq-text-secondary)' }}>Broadcast a 24h photo, video clip, or vibe status to your circle</div>
+          <div style={{ maxWidth: '800px', margin: '0 auto', background: 'var(--zq-surface-card)', padding: '24px', borderRadius: '24px', border: '1px solid var(--zq-glass-border)', boxShadow: '0 12px 36px rgba(0,0,0,0.3)' }}>
+            <div style={{ marginBottom: '22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '24px', filter: 'drop-shadow(0 0 8px #00dfd8)' }}>⚡</span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#fff' }}>24h Aura Moments</h3>
+                  <div style={{ fontSize: '12.5px', color: 'var(--zq-text-secondary)' }}>
+                    {isOwnProfile ? 'Broadcast photo, video clips, and vibe statuses to your circle' : `${profile.name}'s active moments`}
+                  </div>
+                </div>
               </div>
-            </div>}
-            {isOwnProfile ? <StoryRecorder onSaved={load} /> : moments.length > 0 ? (
-              <div className="zq-moments-grid">
+              {isOwnProfile && (
+                <button
+                  type="button"
+                  className="zq-aura-post-trigger-btn"
+                  style={{ padding: '8px 18px', fontSize: '12.5px' }}
+                  onClick={() => setShowStoryModal(true)}
+                >
+                  <span>+</span> Post New Moment
+                </button>
+              )}
+            </div>
+
+            {moments.length > 0 ? (
+              <div className="zq-moments-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px' }}>
                 {moments.map((moment, index) => (
-                  <button type="button" className="zq-moment-card" key={moment.id} onClick={() => setViewingMoment({ groups: [moments.map((item) => ({ ...item, title: username, mediaUrl: item.videoUrl || item.mediaUrl || item.thumbnail }))], groupIndex: 0, storyIndex: index })}>
-                    <img src={getAvatarUrl(moment.author)} alt={moment.caption || 'Aura moment'} />
-                    <span>{moment.caption || 'Aura moment'}</span>
+                  <button
+                    type="button"
+                    className="zq-moment-card"
+                    key={moment.id}
+                    style={{ background: '#060810', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '20px', overflow: 'hidden', padding: '0', cursor: 'pointer', textAlign: 'left' }}
+                    onClick={() =>
+                      setViewingMoment({
+                        groups: [
+                          moments.map((item) => ({
+                            ...item,
+                            title: username,
+                            mediaUrl: item.videoUrl || item.mediaUrl || item.thumbnail,
+                          })),
+                        ],
+                        groupIndex: 0,
+                        storyIndex: index,
+                      })
+                    }
+                  >
+                    <img
+                      src={resolveMediaUrl(moment.videoUrl || moment.mediaUrl || moment.thumbnail || getAvatarUrl(moment.author))}
+                      alt={moment.caption || 'Aura moment'}
+                      style={{ width: '100%', height: '220px', objectFit: 'cover', display: 'block' }}
+                    />
+                    <div style={{ padding: '10px 12px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#fff', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {moment.caption || 'Aura moment'}
+                      </span>
+                    </div>
                   </button>
                 ))}
               </div>
-            ) : <p className="zq-empty-state">No moments shared yet.</p>}
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#8892b0' }}>
+                <div style={{ fontSize: '36px', marginBottom: '10px' }}>⚡</div>
+                <h4 style={{ margin: '0 0 6px 0', color: '#fff' }}>No Active Aura Moments</h4>
+                <p style={{ margin: '0 0 16px 0', fontSize: '13px' }}>
+                  {isOwnProfile ? 'Broadcast a photo, video clip, or vibe status to your community!' : 'No moments shared in the last 24 hours.'}
+                </p>
+                {isOwnProfile && (
+                  <button
+                    type="button"
+                    className="zq-aura-post-trigger-btn"
+                    style={{ margin: '0 auto' }}
+                    onClick={() => setShowStoryModal(true)}
+                  >
+                    <span>📸</span> Create Your First Moment
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+        )}
+
+        {/* Modal for creating a story from profile */}
+        {showStoryModal && (
+          <StoryRecorder
+            onSaved={() => {
+              setShowStoryModal(false);
+              load();
+            }}
+            onClose={() => setShowStoryModal(false)}
+          />
         )}
 
         {/* QORAS tab: shows followers list with profile + chat links */}
