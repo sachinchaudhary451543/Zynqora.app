@@ -34,10 +34,6 @@ export function validateRuntimeConfig(input: Record<string, string | undefined>)
     throw new Error('JWT_SECRET must be at least 32 characters in production');
   }
 
-  if (normalizedNodeEnv === 'production' && !sentryDsn) {
-    throw new Error('SENTRY_DSN is required in production');
-  }
-
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
     throw new Error('PORT must be a valid TCP port');
   }
