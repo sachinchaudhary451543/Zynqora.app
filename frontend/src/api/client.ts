@@ -3,7 +3,8 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? 'http:/
 
 function getApiOrigin() {
   try {
-    return new URL(API_BASE, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000').origin;
+      const apiOrigin = getApiOrigin();
+      throw new Error(`Cannot connect to the backend at ${apiOrigin}. Please try again or contact support if the service is unavailable.`);
   } catch {
     return 'http://localhost:3000';
   }
