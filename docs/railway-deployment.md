@@ -7,9 +7,13 @@ The frontend can remain on Netlify.
 
 1. Create a Railway project from the GitHub repository.
 2. Add a PostgreSQL service in the same project.
-3. Configure the backend service root directory as `/backend`.
-4. Use the Dockerfile builder. Railway will use `backend/railway.json`.
+3. Configure the backend service root directory as `/` so Railway uses the repository-level `railway.json`.
+4. Use the Dockerfile builder. The configuration points to `backend/Dockerfile`.
 5. Generate a public domain for the backend service.
+
+Remove any manually configured build command containing `prisma db push`. The
+repository configuration runs that command only after the image is built and
+the database variables are available.
 
 ## Backend variables
 
