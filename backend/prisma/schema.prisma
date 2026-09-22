@@ -24,7 +24,10 @@ model User {
   updatedAt    DateTime @default(now()) @updatedAt
   resetToken   String?
   resetTokenExpiresAt DateTime?
+  refreshTokenHash String?
+  refreshTokenExpiresAt DateTime?
   recoveryCodeHash String?
+  tokenVersion Int @default(0)
 
   // Privacy settings
   profileVisibility     String @default("PUBLIC")      // PUBLIC, FOLLOWERS_ONLY, PRIVATE
@@ -41,6 +44,45 @@ model User {
   messages     Message[]
   notificationsReceived Notification[] @relation("NotificationRecipient")
   notificationsSent     Notification[] @relation("NotificationActor")
+  deviceTokens          DeviceToken[]
+  circleMemberships     CircleMember[]
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Circle {
+  id          String        @id @default(uuid())
+  slug        String        @unique
+  name        String
+  description String?
+  icon        String?
+  createdAt   DateTime      @default(now())
+  members     CircleMember[]
+  posts       Post[]
+}
+
+model CircleMember {
+  id       String   @id @default(uuid())
+  circleId String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  circle Circle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([circleId, userId])
+  @@index([userId])
 }
 
 model Follow {
@@ -53,6 +95,7 @@ model Follow {
   following User @relation("following", fields: [followingId], references: [id])
 
   @@unique([followerId, followingId])
+  @@index([followerId, createdAt])
   @@index([followingId])
 }
 
@@ -68,6 +111,7 @@ model Notification {
   recipient User @relation("NotificationRecipient", fields: [recipientId], references: [id])
   actor     User @relation("NotificationActor", fields: [actorId], references: [id])
 
+  @@index([recipientId, read, createdAt])
   @@index([recipientId, createdAt])
 }
 
@@ -83,13 +127,17 @@ model Post {
   musicUrl   String?
   musicType  String?        // "audio"
   visibility String         @default("FOLLOWERS")
+  circleId   String?
   createdAt  DateTime       @default(now())
 
   author   User      @relation(fields: [authorId], references: [id])
+  circle   Circle?   @relation(fields: [circleId], references: [id], onDelete: SetNull)
   likes    Like[]
   comments Comment[]
 
+  @@index([createdAt])
   @@index([authorId, createdAt])
+  @@index([circleId, createdAt])
 }
 
 model Like {
@@ -102,6 +150,7 @@ model Like {
   user User @relation("UserLikes", fields: [userId], references: [id])
 
   @@unique([postId, userId])
+  @@index([createdAt])
   @@index([postId])
   @@index([userId])
 }
@@ -116,7 +165,8 @@ model Comment {
   post   Post @relation(fields: [postId], references: [id])
   author User @relation("UserComments", fields: [authorId], references: [id])
 
-  @@index([postId])
+  @@index([createdAt])
+  @@index([postId, createdAt])
   @@index([authorId])
 }
 
@@ -152,6 +202,7 @@ model ConversationParticipant {
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   user           User @relation(fields: [userId], references: [id])
 
+  @@unique([conversationId, userId])
   @@index([conversationId])
   @@index([userId])
 }
@@ -166,6 +217,7 @@ model Message {
   conversation Conversation @relation(fields: [conversationId], references: [id])
   sender       User @relation(fields: [senderId], references: [id])
 
+  @@index([conversationId, createdAt])
   @@index([conversationId])
   @@index([senderId])
 }

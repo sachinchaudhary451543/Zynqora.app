@@ -1,11 +1,10 @@
 services:
   - type: web
     name: zynqora-api
-    runtime: node
-    rootDir: backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     plan: free
-    buildCommand: npm install --include=dev && npx prisma generate && npm run prisma:push && npm run build
-    startCommand: npx ts-node src/main.ts
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
@@ -20,4 +19,6 @@ services:
       - key: CORS_ORIGIN
         sync: false
       - key: SERVER_BASE_URL
+        sync: false
+      - key: SENTRY_DSN
         sync: false

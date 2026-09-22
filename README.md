@@ -239,13 +239,14 @@ Recommended configuration:
 - SPA fallback: enabled by `netlify.toml`
 - Environment variable: `VITE_API_BASE=https://your-backend-host/api`
 
-### Backend: Render
+### Backend: Railway with Supabase
 
-The repository includes `render.yaml` for backend deployment.
+The repository includes `railway.json` for Docker-based backend deployment.
 
 Recommended production settings:
 
 - Use managed PostgreSQL/Supabase for `DATABASE_URL`
+- This project uses Supabase for the production database; do not reference a Railway PostgreSQL variable
 - Set a strong `JWT_SECRET`
 - Set `CORS_ORIGIN=https://zynqora.netlify.app`
 - Keep secrets in platform environment variables only

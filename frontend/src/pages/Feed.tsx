@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { api, Post, getAvatarUrl, getDefaultAvatar, resolveMediaUrl } from '../api/client';
 import PostCard from '../components/PostCard';
 import Suggestions from '../components/Suggestions';
-import StoryViewerModal from '../components/StoryViewerModal';
-import StoryRecorder from '../components/StoryRecorder';
+import CommunityCirclesBar from '../components/CommunityCirclesBar';
 import { useAuth } from '../context/AuthContext';
+
+const StoryRecorder = React.lazy(() => import('../components/StoryRecorder'));
+const StoryViewerModal = React.lazy(() => import('../components/StoryViewerModal'));
 import LiveStreamModal from '../components/LiveStreamModal';
 import { createRealtimeSocket } from '../realtime';
 
@@ -23,16 +25,6 @@ export default function Feed() {
   const [showStoryRecorder, setShowStoryRecorder] = useState(false);
   const [liveRooms, setLiveRooms] = useState<any[]>([]);
   const [liveViewing, setLiveViewing] = useState<any | null>(null);
-
-  // Preset Community Circles (Qoras)
-  const circles = [
-    { id: 'all', name: '🌍 Global Sync', count: '14.2k' },
-    { id: 'tech', name: '🚀 Tech Innovators', count: '5.4k' },
-    { id: 'family', name: '🏡 Family Sanctuary', count: '12' },
-    { id: 'creative', name: '🎨 Creative Studio', count: '3.8k' },
-    { id: 'gaming', name: '🎮 Gaming Hub', count: '8.1k' },
-    { id: 'zen', name: '🌿 Zen & Wellness', count: '2.9k' },
-  ];
 
   const sampleStories = [
     {
@@ -73,16 +65,16 @@ export default function Feed() {
       authorName: 'Lisa Brown',
       vibe: '✨ Inspired',
       authorAvatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&h=120&fit=crop',
-      mediaUrl: 'https://images.unsplash.com/photo-1579783902614-e3fb5141b0cb?w=800&fit=crop',
+      mediaUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&fit=crop',
     },
   ];
 
-  const loadFeed = async (cursor?: string, append = false) => {
+  const loadFeed = async (cursor?: string, append = false, circleId = selectedCircle) => {
     if (append) setLoadingMore(true);
     else setLoading(true);
 
     try {
-      const res = await api.getFeed(cursor);
+      const res = await api.getFeed(cursor, circleId);
       if (append) setPosts((p) => [...p, ...res.posts]);
       else setPosts(res.posts);
       setNextCursor(res.nextCursor);
@@ -104,18 +96,21 @@ export default function Feed() {
   };
 
   useEffect(() => {
-    loadFeed();
+    loadFeed(undefined, false, selectedCircle);
+  }, [selectedCircle]);
+
+  useEffect(() => {
     loadStories();
 
-    const handleCreated = () => loadFeed();
-    const handleDeleted = () => loadFeed();
+    const handleCreated = () => loadFeed(undefined, false, selectedCircle);
+    const handleDeleted = () => loadFeed(undefined, false, selectedCircle);
     window.addEventListener('ig-post-created', handleCreated);
     window.addEventListener('ig-post-deleted', handleDeleted);
     return () => {
       window.removeEventListener('ig-post-created', handleCreated);
       window.removeEventListener('ig-post-deleted', handleDeleted);
     };
-  }, []);
+  }, [selectedCircle]);
 
   useEffect(() => {
     const socket = createRealtimeSocket();
@@ -139,30 +134,12 @@ export default function Feed() {
   );
   const userAvatar = getAvatarUrl(user);
 
-  // Filter posts if circle is selected
-  const filteredPosts = posts.filter((p) => {
-    if (selectedCircle === 'all') return true;
-    if (selectedCircle === 'tech') return p.content?.toLowerCase().includes('app') || p.content?.toLowerCase().includes('code') || true;
-    return true;
-  });
-
   return (
     <div className="zq-feed-container">
       {/* Main Stream Column */}
       <div className="zq-feed-stream">
         {/* Community Circles (Qoras) Bar */}
-        <div className="zq-circles-bar">
-          {circles.map((c) => (
-            <button
-              key={c.id}
-              className={`zq-circle-pill ${selectedCircle === c.id ? 'active' : ''}`}
-              onClick={() => setSelectedCircle(c.id)}
-            >
-              <span>{c.name}</span>
-              <span style={{ fontSize: '10px', opacity: 0.75 }}>({c.count})</span>
-            </button>
-          ))}
-        </div>
+        <CommunityCirclesBar selectedId={selectedCircle} onSelect={(circle) => setSelectedCircle(circle.id)} />
 
         {liveRooms.length > 0 && <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '8px 0 14px' }}>
           {liveRooms.filter((room) => room.broadcasterId !== user?.id).map((room) => <button type="button" key={room.broadcasterId} className="zq-btn-glass" onClick={() => setLiveViewing({ room, broadcaster: false })}>🔴 {room.title}</button>)}
@@ -295,35 +272,32 @@ export default function Feed() {
         </div>
 
         {/* Story Recorder Modal */}
+        {/* Story Recorder Modal */}
         {showStoryRecorder && (
-          <div className="zq-modal-overlay" onClick={() => setShowStoryRecorder(false)}>
-            <div className="zq-modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
-              <div className="zq-modal-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '18px' }}>⚡</span>
-                  <span style={{ color: '#fff', fontWeight: 800 }}>Publish Aura Moment / Status</span>
-                </div>
-                <button className="zq-modal-close-btn" onClick={() => setShowStoryRecorder(false)}>✕</button>
-              </div>
-              <div style={{ padding: '20px', maxHeight: '80vh', overflowY: 'auto' }}>
-                <StoryRecorder
-                  onSaved={() => {
-                    setShowStoryRecorder(false);
-                    loadStories();
-                  }}
-                  onClose={() => setShowStoryRecorder(false)}
-                />
-              </div>
+          <Suspense fallback={
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '500px', color: '#00dfd8', fontSize: '14px', flexDirection: 'column', gap: '12px' }}>
+              <span className="zq-pulse-orb" style={{ display: 'inline-block' }} />
+              <span>Loading Aura Studio...</span>
             </div>
-          </div>
+          }>
+            <StoryRecorder
+              onSaved={() => {
+                setShowStoryRecorder(false);
+                loadStories();
+              }}
+              onClose={() => setShowStoryRecorder(false)}
+            />
+          </Suspense>
         )}
 
         {/* Story Viewer Lightbox */}
         {viewingStory && (
-          <StoryViewerModal
-            story={viewingStory}
-            onClose={() => setViewingStory(null)}
-          />
+          <Suspense fallback={null}>
+            <StoryViewerModal
+              story={viewingStory}
+              onClose={() => setViewingStory(null)}
+            />
+          </Suspense>
         )}
         {liveViewing && <LiveStreamModal room={liveViewing.room} broadcaster={false} onClose={() => setLiveViewing(null)} />}
 
@@ -341,7 +315,7 @@ export default function Feed() {
           </div>
         )}
 
-        {!loading && filteredPosts.length === 0 && (
+        {!loading && posts.length === 0 && (
           <div
             style={{
               textAlign: 'center',
@@ -359,7 +333,7 @@ export default function Feed() {
           </div>
         )}
 
-        {filteredPosts.map((post) => (
+        {posts.map((post) => (
           <PostCard key={post.id} post={post} />
         ))}
 
@@ -367,7 +341,7 @@ export default function Feed() {
           <div style={{ textAlign: 'center', margin: '24px 0' }}>
             <button
               className="zq-btn-glass"
-              onClick={() => loadFeed(nextCursor, true)}
+              onClick={() => loadFeed(nextCursor, true, selectedCircle)}
               disabled={loadingMore}
             >
               {loadingMore ? 'Syncing...' : 'Load more Syncs'}

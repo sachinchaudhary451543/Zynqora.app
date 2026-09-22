@@ -75,13 +75,32 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
         </NavLink>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <NavLink
+            to="/explore"
+            style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: '50%',
+              width: '36px',
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--zq-text-primary)',
+              textDecoration: 'none',
+            }}
+            title="Explore & Discover"
+          >
+            <ExploreIcon size={18} active={location.pathname === '/explore'} />
+          </NavLink>
+
           <button
             type="button"
             className="zq-sparks-btn"
             onClick={() => setShowNotifications(!showNotifications)}
             style={{
-              background: '#ffffff',
-              border: '1px solid #bfd0dc',
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '50%',
               width: '36px',
               height: '36px',
@@ -92,9 +111,10 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
               position: 'relative',
               cursor: 'pointer',
             }}
+            title="Aura Sparks"
           >
             <NotificationsIcon size={18} active={showNotifications} />
-            <span className="zq-badge-dot" style={{ top: '6px', right: '6px' }} />
+            {visibleUnreadCount > 0 && <span className="zq-badge-dot" style={{ top: '6px', right: '6px' }} />}
           </button>
         </div>
       </header>
@@ -110,11 +130,11 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
         </NavLink>
 
         <NavLink
-          to="/explore"
+          to="/aura"
           className={({ isActive }) => `zq-mobile-nav-btn ${isActive ? 'active' : ''}`}
         >
-          <ExploreIcon size={22} active={location.pathname === '/explore'} />
-          <span>Discover</span>
+          <span style={{ fontSize: '20px', lineHeight: 1 }}>⚡</span>
+          <span>Aura</span>
         </NavLink>
 
         {/* Center Create Post Floating Button */}
@@ -135,7 +155,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             <MessagesIcon size={22} active={location.pathname.startsWith('/chat')} />
             {visibleUnreadCount > 0 && <span className="zq-badge-count" style={{ top: '-4px', right: '-8px' }}>{visibleUnreadCount}</span>}
           </div>
-          <span>Sync Chat</span>
+          <span>Chat</span>
         </NavLink>
 
         {user && (
@@ -151,7 +171,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
                 onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
               />
             </div>
-            <span>My Aura</span>
+            <span>Profile</span>
           </NavLink>
         )}
       </nav>
@@ -186,6 +206,18 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
                 <CirclesIcon size={22} active={location.pathname === '/circles'} />
               </div>
               <span className="zq-nav-label">Circles Hub</span>
+            </NavLink>
+
+            <NavLink
+              to="/aura"
+              className={({ isActive }) => `zq-nav-item ${isActive ? 'active' : ''}`}
+              title="Aura Moments (24h Stories)"
+            >
+              <div className="zq-nav-icon-container">
+                <span style={{ fontSize: '20px', filter: 'drop-shadow(0 0 6px #00dfd8)' }}>⚡</span>
+                <span className="zq-badge-dot" style={{ background: '#00dfd8', boxShadow: '0 0 8px #00dfd8' }} />
+              </div>
+              <span className="zq-nav-label">Aura Stories</span>
             </NavLink>
 
             <NavLink

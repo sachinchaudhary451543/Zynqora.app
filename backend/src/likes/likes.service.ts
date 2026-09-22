@@ -31,10 +31,14 @@ export class LikesService {
 
   async getLikes(viewerId: string, postId: string) {
     await this.postsService.ensureCanViewPost(viewerId, postId);
-    const likes = await this.prisma.like.findMany({
-      where: { postId },
-      include: { user: { select: { id: true, username: true, name: true } } },
-    });
-    return { count: likes.length, likes };
+    const [count, likes] = await Promise.all([
+      this.prisma.like.count({ where: { postId } }),
+      this.prisma.like.findMany({
+        where: { postId },
+        take: 100,
+        include: { user: { select: { id: true, username: true, name: true } } },
+      }),
+    ]);
+    return { count, likes };
   }
 }

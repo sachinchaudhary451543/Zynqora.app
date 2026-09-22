@@ -3,7 +3,8 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? 'http:/
 
 function getApiOrigin() {
   try {
-    return new URL(API_BASE, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000').origin;
+      const apiOrigin = getApiOrigin();
+      throw new Error(`Cannot connect to the backend at ${apiOrigin}. Please try again or contact support if the service is unavailable.`);
   } catch {
     return 'http://localhost:3000';
   }
@@ -86,6 +87,13 @@ export interface Post {
   musicUrl?: string | null;
   musicType?: string | null;
   visibility?: string;
+  circleId?: string | null;
+  circle?: {
+    id: string;
+    slug: string;
+    name: string;
+    icon?: string | null;
+  } | null;
   createdAt: string;
   author: {
     id?: string;
@@ -134,6 +142,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       },
     });
 
+    if (res.status === 401 && path === '/auth/refresh') {
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (typeof window !== 'undefined') window.location.href = '/login';
+    }
+
     if (!res.ok) {
       if (res.status === 401 && !path.startsWith('/auth/')) {
         localStorage.removeItem('token');
@@ -159,16 +174,22 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   signup: (data: { email: string; username: string; password: string; name: string }) =>
-    request<{ token: string; user: User; recoveryCode: string }>('/auth/signup', {
+    request<{ token: string; refreshToken: string; user: User; recoveryCode: string }>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   login: (data: { email: string; password: string }) =>
-    request<{ token: string; user: User }>('/auth/login', {
+    request<{ token: string; refreshToken: string; user: User }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  refresh: (refreshToken: string) =>
+    request<{ token: string; refreshToken: string; user: User }>('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    }),
+  logout: () => request<{ message: string }>('/auth/logout', { method: 'POST' }),
   checkUsername: (username: string) =>
     request<{ available: boolean; valid: boolean; message: string }>(`/auth/username-availability?username=${encodeURIComponent(username)}`),
   forgotPassword: (identifier: string, recoveryCode: string) => request<{ message: string; resetToken?: string }>('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ identifier, recoveryCode }) }),
@@ -176,9 +197,13 @@ export const api = {
 
   getProfile: (username: string) => request<User>(`/users/${username}`),
 
-  getFollowers: (username: string) => request<any[]>(`/users/${username}/followers`),
-  getFollowing: (username: string) => request<any[]>(`/users/${username}/following`),
+  getFollowers: (username: string, cursor?: string) => request<any[]>(`/users/${username}/followers${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
+  getFollowing: (username: string, cursor?: string) => request<any[]>(`/users/${username}/following${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
   getNotifications: () => request<any[]>('/users/me/notifications'),
+  registerDeviceToken: (data: { token: string; platform: 'android' | 'ios' }) =>
+    request<{ id: string; token: string; platform: string }>('/users/me/device-tokens', { method: 'POST', body: JSON.stringify(data) }),
+  removeDeviceToken: (token: string) =>
+    request<{ removed: boolean }>('/users/me/device-tokens/current', { method: 'DELETE', body: JSON.stringify({ token }) }),
 
   updateProfile: (data: {
     name?: string;
@@ -193,16 +218,26 @@ export const api = {
 
   updatePrivacy: (data: { profileVisibility?: string; followersVisibility?: string; followingVisibility?: string }) =>
     request('/users/me/privacy', { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteAccount: () => request<{ deleted: boolean }>('/users/me', { method: 'DELETE' }),
 
   follow: (username: string) => request(`/users/${username}/follow`, { method: 'POST' }),
   unfollow: (username: string) => request(`/users/${username}/unfollow`, { method: 'POST' }),
 
-  createPost: (data: { content?: string; mediaUrl?: string; mediaType?: string; musicUrl?: string; musicType?: string; visibility?: string }) =>
+  getCircles: () => request<Array<{ id: string; slug: string; name: string; description?: string | null; icon?: string | null; memberCount: number; postCount: number | null; isMember: boolean }>>('/circles'),
+  joinCircle: (slug: string) => request<{ joined: boolean; slug: string }>(`/circles/${encodeURIComponent(slug)}/join`, { method: 'POST' }),
+  leaveCircle: (slug: string) => request<{ joined: boolean; slug: string }>(`/circles/${encodeURIComponent(slug)}/leave`, { method: 'DELETE' }),
+
+  createPost: (data: { content?: string; mediaUrl?: string; mediaType?: string; musicUrl?: string; musicType?: string; visibility?: string; circleId?: string }) =>
     request<Post>('/posts', { method: 'POST', body: JSON.stringify(data) }),
   deletePost: (postId: string) => request<{ deleted: boolean }>(`/posts/${postId}`, { method: 'DELETE' }),
 
-  getFeed: (cursor?: string) =>
-    request<{ posts: Post[]; nextCursor: string | null }>(`/posts/feed${cursor ? `?cursor=${cursor}` : ''}`),
+  getFeed: (cursor?: string, circle?: string) => {
+    const params = new URLSearchParams();
+    if (cursor) params.set('cursor', cursor);
+    if (circle && circle !== 'all') params.set('circle', circle);
+    const qs = params.toString();
+    return request<{ posts: Post[]; nextCursor: string | null }>(`/posts/feed${qs ? `?${qs}` : ''}`);
+  },
 
   getUserPosts: (username: string) => request<Post[]>(`/posts/user/${username}`),
 
@@ -219,8 +254,8 @@ export const api = {
   // Stories
   createStory: (data: { videoUrl: string; thumbnail?: string; caption?: string; visibility?: string }) =>
     request('/stories', { method: 'POST', body: JSON.stringify(data) }),
-  getActiveStories: () => request<any[]>('/stories/active'),
-  getUserStories: (username: string) => request<any[]>(`/stories/${username}`),
+  getActiveStories: (cursor?: string) => request<any[]>(`/stories/active${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
+  getUserStories: (username: string, cursor?: string) => request<any[]>(`/stories/${username}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
   // Chat
   createConversation: (username: string) => request<{ id: string; participants: any[] }>(`/chat/conversation/${username}`, { method: 'POST' }),
   getConversations: () => request<Array<{ id: string; status: string; requesterId?: string; lastMessage: any; user: User }>>('/chat/conversations'),

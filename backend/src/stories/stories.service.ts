@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { authorSelect, getFollowSets } from '../common/social-access';
+import { buildCursorPageArgs } from '../common/pagination';
 
 @Injectable()
 export class StoriesService {
@@ -56,23 +57,27 @@ export class StoriesService {
     }
   }
 
-  async getStoriesForUser(username: string) {
+  async getStoriesForUser(username: string, cursor?: string, limit = 20) {
     const user = await this.prisma.user.findUnique({ where: { username }, select: { id: true } });
-    if (!user) return [];
+    if (!user) return Object.assign([], { nextCursor: null });
     const now = new Date();
-    return this.prisma.story.findMany({
+    const page = buildCursorPageArgs({ cursor, limit, maxLimit: 50 });
+    const stories = await this.prisma.story.findMany({
       where: { authorId: user.id, expiresAt: { gt: now } },
       orderBy: { createdAt: 'desc' },
+      ...page,
       include: {
         author: { select: authorSelect },
       },
     });
+    return Object.assign(stories, { nextCursor: stories.length === page.take ? stories[stories.length - 1].id : null });
   }
 
-  async getActiveStories(viewerId: string) {
+  async getActiveStories(viewerId: string, cursor?: string, limit = 20) {
     const now = new Date();
     const { followingIds, mutualIds } = await getFollowSets(this.prisma, viewerId);
-    return this.prisma.story.findMany({
+    const page = buildCursorPageArgs({ cursor, limit, maxLimit: 50 });
+    const stories = await this.prisma.story.findMany({
       where: {
         expiresAt: { gt: now },
         OR: [
@@ -83,16 +88,19 @@ export class StoriesService {
         ],
       },
       orderBy: { createdAt: 'desc' },
+      ...page,
       include: {
         author: { select: authorSelect },
       },
     });
+    return Object.assign(stories, { nextCursor: stories.length === page.take ? stories[stories.length - 1].id : null });
   }
 
-  async getActiveStoriesForUser(username: string, viewerId: string) {
+  async getActiveStoriesForUser(username: string, viewerId: string, cursor?: string, limit = 20) {
     const now = new Date();
     const { followingIds, mutualIds } = await getFollowSets(this.prisma, viewerId);
-    return this.prisma.story.findMany({
+    const page = buildCursorPageArgs({ cursor, limit, maxLimit: 50 });
+    const stories = await this.prisma.story.findMany({
       where: {
         author: { username },
         expiresAt: { gt: now },
@@ -104,9 +112,11 @@ export class StoriesService {
         ],
       },
       orderBy: { createdAt: 'desc' },
+      ...page,
       include: {
         author: { select: authorSelect },
       },
     });
+    return Object.assign(stories, { nextCursor: stories.length === page.take ? stories[stories.length - 1].id : null });
   }
 }

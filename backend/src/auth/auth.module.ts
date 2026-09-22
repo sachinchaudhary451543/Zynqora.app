@@ -5,18 +5,21 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { PrismaModule } from '../prisma/prisma.module';
+import { validateRuntimeConfig } from '../common/runtime-config';
+
+const runtimeConfig = validateRuntimeConfig(process.env as Record<string, string | undefined>);
 
 @Module({
   imports: [
     PrismaModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: process.env.JWT_SECRET ?? 'dev-secret-change-me',
-      signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? '7d' },
+      secret: runtimeConfig.jwtSecret,
+      signOptions: { expiresIn: runtimeConfig.jwtExpiresIn },
     }),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, JwtModule, PassportModule],
 })
 export class AuthModule {}
