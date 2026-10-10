@@ -73,6 +73,7 @@ export default function Explore() {
 
   return (
     <div style={{ maxWidth: '1000px', margin: '28px auto 80px auto', padding: '0 20px', width: '100%' }}>
+      <h1 className="zq-sr-only">Discover creators and circles</h1>
       {/* Search Header */}
       <div style={{ maxWidth: '500px', margin: '0 auto 24px auto', position: 'relative' }}>
         <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--zq-accent-cyan)', display: 'flex' }}>

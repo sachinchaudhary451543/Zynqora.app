@@ -253,7 +253,7 @@ export default function PostCard({ post }: { post: Post }) {
       {/* Header with Circle Tag */}
       <div className="zq-post-header">
         <div className="zq-post-author-row">
-          <Link to={`/profile/${post.author.username}`}>
+          <Link to={`/profile/${post.author.username}`} className="zq-post-author-link">
             <div className="zq-avatar-ring" style={{ width: '38px', height: '38px' }}>
               <img
                 src={authorAvatar}
@@ -266,21 +266,20 @@ export default function PostCard({ post }: { post: Post }) {
                 }}
               />
             </div>
-          </Link>
-
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Link to={`/profile/${post.author.username}`} className="zq-post-author-name">
+            <div>
+              <div className="zq-post-author-heading">
+                <span className="zq-post-author-name">
                 {post.author.username}
-              </Link>
-              <span className="zq-post-circle-badge">{circleBadge}</span>
+                </span>
+                  <span className="zq-post-circle-badge">{circleBadge}</span>
+              </div>
+              <div className="zq-post-meta-sub">
+                <span>{post.author.name}</span>
+                <span>•</span>
+                <span>{formatTimeAgo(post.createdAt)}</span>
+              </div>
             </div>
-            <div className="zq-post-meta-sub">
-              <span>{post.author.name}</span>
-              <span>•</span>
-              <span>{formatTimeAgo(post.createdAt)}</span>
-            </div>
-          </div>
+          </Link>
         </div>
 
         {user?.username === post.author.username && (
@@ -391,18 +390,19 @@ export default function PostCard({ post }: { post: Post }) {
             <button
               type="button"
               className={`zq-reaction-btn ${liked ? 'reacted' : ''}`}
+              aria-label="Like post"
               onClick={handleLikeToggle}
             >
               <span>{reactionType || '⚡'}</span>
               <span>{likeCount} Syncs</span>
             </button>
-            <button type="button" className="zq-reaction-btn" onClick={() => handleSelectReaction('❤️')}>
+            <button type="button" className="zq-reaction-btn" aria-label="Like post" onClick={() => handleSelectReaction('❤️')}>
               <span>❤️</span>
             </button>
-            <button type="button" className="zq-reaction-btn" onClick={() => handleSelectReaction('🔥')}>
+            <button type="button" className="zq-reaction-btn" aria-label="Fire reaction" onClick={() => handleSelectReaction('🔥')}>
               <span>🔥</span>
             </button>
-            <button type="button" className="zq-reaction-btn" onClick={() => handleSelectReaction('💡')}>
+            <button type="button" className="zq-reaction-btn" aria-label="Idea reaction" onClick={() => handleSelectReaction('💡')}>
               <span>💡</span>
             </button>
           </div>

@@ -50,6 +50,7 @@ export default function StoryRecorder({ onSaved, onClose, standalone = false }: 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingTimerRef = useRef<number | undefined>(undefined);
 
   // Screen flow: 'picker' (default) -> 'camera' OR 'preview'
   const [screen, setScreen] = useState<Screen>('picker');
@@ -80,13 +81,18 @@ export default function StoryRecorder({ onSaved, onClose, standalone = false }: 
   /* ─── Camera ──────────────────────────────────────────────── */
   const startCamera = useCallback(async (facing: 'user' | 'environment' = cameraFacing) => {
     setCameraError('');
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera capture requires a secure HTTPS connection and a supported browser.');
+      setCameraActive(false);
+      return;
+    }
     try {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: facing, width: { ideal: 1080 }, height: { ideal: 1920 } },
-        audio: true,
+        audio: captureMode === 'video',
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -94,13 +100,23 @@ export default function StoryRecorder({ onSaved, onClose, standalone = false }: 
         await videoRef.current.play();
       }
       setCameraActive(true);
-    } catch {
-      setCameraError('Camera access not available or permission denied.');
+    } catch (error) {
+      const name = error instanceof DOMException ? error.name : '';
+      setCameraError(name === 'NotAllowedError'
+        ? 'Camera or microphone permission was denied. Allow access in your browser or device settings and try again.'
+        : name === 'NotFoundError'
+          ? 'No compatible camera was found. You can still choose media from your device.'
+          : 'Camera access is unavailable. You can still choose media from your device.');
       setCameraActive(false);
     }
-  }, [cameraFacing]);
+  }, [cameraFacing, captureMode]);
 
   const stopCamera = useCallback(() => {
+    if (recordingTimerRef.current !== undefined) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = undefined;
+    }
+    if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setCameraActive(false);
@@ -145,15 +161,30 @@ export default function StoryRecorder({ onSaved, onClose, standalone = false }: 
 
   const startRecording = () => {
     if (!streamRef.current) return;
+    if (typeof MediaRecorder === 'undefined') {
+      setCameraError('Video recording is not supported in this browser. Choose a video from your device instead.');
+      return;
+    }
+    const mimeType = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+      'video/mp4',
+    ].find((type) => MediaRecorder.isTypeSupported(type));
+    if (!mimeType) {
+      setCameraError('Video recording is not supported in this browser. Choose a video from your device instead.');
+      return;
+    }
     const chunks: Blob[] = [];
-    const mr = new MediaRecorder(streamRef.current, { mimeType: 'video/webm; codecs=vp8' });
+    const mr = new MediaRecorder(streamRef.current, { mimeType });
     mediaRecorderRef.current = mr;
     mr.ondataavailable = (e) => {
       if (e.data.size > 0) chunks.push(e.data);
     };
     mr.onstop = () => {
-      const blob = new Blob(chunks, { type: 'video/webm' });
-      const file = new File([blob], `aura-${Date.now()}.webm`, { type: 'video/webm' });
+      const blob = new Blob(chunks, { type: mimeType });
+      const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
+      const file = new File([blob], `aura-${Date.now()}.${extension}`, { type: mimeType });
       setSelectedFile(file);
       setMediaType('video');
       setIsGradientStory(false);
@@ -164,10 +195,13 @@ export default function StoryRecorder({ onSaved, onClose, standalone = false }: 
     mr.start();
     setRecording(true);
     setRecordedSeconds(0);
-    const timer = setInterval(() => {
+    recordingTimerRef.current = window.setInterval(() => {
       setRecordedSeconds((prev) => {
         if (prev >= 14) {
-          clearInterval(timer);
+          if (recordingTimerRef.current !== undefined) {
+            window.clearInterval(recordingTimerRef.current);
+            recordingTimerRef.current = undefined;
+          }
           mr.stop();
           setRecording(false);
           return 15;
@@ -178,6 +212,10 @@ export default function StoryRecorder({ onSaved, onClose, standalone = false }: 
   };
 
   const stopRecording = () => {
+    if (recordingTimerRef.current !== undefined) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = undefined;
+    }
     mediaRecorderRef.current?.stop();
     setRecording(false);
   };
@@ -287,7 +325,7 @@ export default function StoryRecorder({ onSaved, onClose, standalone = false }: 
 
       let publicUrl = '';
       if (fileToUpload) {
-        const res = await api.uploadLocal(fileToUpload);
+        const res = await api.uploadMedia(fileToUpload);
         publicUrl = res.publicUrl;
       } else if (previewUrl) {
         publicUrl = previewUrl;

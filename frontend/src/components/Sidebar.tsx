@@ -150,6 +150,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
         <NavLink
           to="/aura"
           className={({ isActive }) => `zq-mobile-nav-btn ${isActive ? 'active' : ''}`}
+          aria-label="Aura Sync"
         >
           <span style={{ fontSize: '20px', lineHeight: 1 }}>⚡</span>
           <span>Aura</span>
@@ -159,6 +160,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
         <button
           type="button"
           className="zq-mobile-create-btn"
+          aria-label="Write a new post"
           onClick={onOpenCreateModal}
           title="Create Sync Post"
         >
@@ -168,6 +170,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
         <NavLink
           to="/chat"
           className={({ isActive }) => `zq-mobile-nav-btn ${isActive ? 'active' : ''}`}
+          aria-label="Messages"
         >
           <div style={{ position: 'relative' }}>
             <MessagesIcon size={22} active={location.pathname.startsWith('/chat')} />
@@ -207,6 +210,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             <NavLink
               to="/feed"
               className={({ isActive }) => `zq-nav-item ${isActive ? 'active' : ''}`}
+              aria-label="Open Circles"
               title="Sync Stream (Home Feed)"
             >
               <div className="zq-nav-icon-container">
@@ -218,6 +222,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             <NavLink
               to="/circles"
               className={({ isActive }) => `zq-nav-item ${isActive ? 'active' : ''}`}
+              aria-label="Open Circles"
               title="Community Circles (Qoras)"
             >
               <div className="zq-nav-icon-container">
@@ -229,6 +234,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             <NavLink
               to="/aura"
               className={({ isActive }) => `zq-nav-item ${isActive ? 'active' : ''}`}
+              aria-label="Aura Sync"
               title="Aura Moments (24h Stories)"
             >
               <div className="zq-nav-icon-container">
@@ -252,6 +258,7 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
             <NavLink
               to="/chat"
               className={({ isActive }) => `zq-nav-item ${isActive ? 'active' : ''}`}
+              aria-label="Messages"
               title="Direct Sync Messages"
             >
               <div className="zq-nav-icon-container">

@@ -64,15 +64,15 @@ export const ZynqoraWordmark: React.FC<{ className?: string }> = ({ className })
     </span>
     <span
       style={{
-        fontSize: '8px',
+        fontSize: '10px',
         fontWeight: 600,
         letterSpacing: '1px',
-        color: 'var(--zq-text-muted)',
+        color: '#4A5F6C',
         marginTop: '3px',
         textTransform: 'uppercase',
       }}
     >
-      SYNC • CORE • AURA
+      <span className="zq-wordmark-tagline">SYNC • CORE • AURA</span>
     </span>
   </div>
 );

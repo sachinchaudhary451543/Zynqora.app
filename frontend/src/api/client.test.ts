@@ -24,6 +24,36 @@ describe('api client helpers', () => {
     expect(getDefaultAvatar('Alex')).toBe(first);
   });
 
+  it('uploads media through the signed URL and rejects failed storage responses', async () => {
+    const presign = vi.spyOn(api, 'presignUpload').mockResolvedValue({
+      method: 'PUT',
+      uploadUrl: 'https://storage.example/upload',
+      publicUrl: 'https://cdn.example/photo.png',
+      key: 'photo.png',
+    });
+    const uploadLocal = vi.spyOn(api, 'uploadLocal');
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await expect(api.uploadMedia(new File(['image'], 'photo.png', { type: 'image/png' })))
+        .resolves.toEqual({ key: 'photo.png', publicUrl: 'https://cdn.example/photo.png' });
+      expect(fetchMock).toHaveBeenCalledWith('https://storage.example/upload', expect.objectContaining({
+        method: 'PUT',
+        headers: { 'Content-Type': 'image/png' },
+      }));
+      expect(uploadLocal).not.toHaveBeenCalled();
+
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 403 }));
+      await expect(api.uploadMedia(new File(['image'], 'photo.png', { type: 'image/png' })))
+        .rejects.toThrow('Media upload failed (403)');
+    } finally {
+      presign.mockRestore();
+      uploadLocal.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('requests a nonce and submits the Google ID token to the auth endpoints', async () => {
     const values = new Map<string, string>();
     const storage = {

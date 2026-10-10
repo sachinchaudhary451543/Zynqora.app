@@ -213,18 +213,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
       let publishMusicFile = musicFile;
 
       if (mediaFile) {
-        const presign = await api.presignUpload(mediaFile.name, mediaFile.type);
-        if (presign.method === 'PUT') {
-          await fetch(presign.uploadUrl, {
-            method: 'PUT',
-            body: mediaFile,
-            headers: { 'Content-Type': mediaFile.type },
-          });
-          finalMediaUrl = presign.publicUrl;
-        } else {
-          const res = await api.uploadLocal(mediaFile);
-          finalMediaUrl = res.publicUrl;
-        }
+        finalMediaUrl = (await api.uploadMedia(mediaFile)).publicUrl;
       }
 
       if ((musicFile || musicUrl) && musicTrimEnd > musicTrimStart && musicDuration > musicTrimEnd) {
@@ -236,7 +225,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
       }
 
       if (publishMusicFile) {
-        const uploadedMusic = await api.uploadLocal(publishMusicFile);
+        const uploadedMusic = await api.uploadMedia(publishMusicFile);
         finalMusicUrl = uploadedMusic.publicUrl;
       }
 
@@ -843,6 +832,7 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
                 </div>
                 <textarea
                   className="zq-studio-caption-input"
+                  aria-label="Write a new post"
                   rows={3}
                   maxLength={500}
                   placeholder={

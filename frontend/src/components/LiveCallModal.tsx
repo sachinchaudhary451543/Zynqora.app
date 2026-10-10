@@ -8,6 +8,8 @@ interface LiveCallModalProps {
   onEndCall: () => void;
   callId?: string;
   initiator?: boolean;
+  currentUserId: string;
+  onDeclineCall?: () => void;
 }
 
 /* ─── Web Audio ringtone (no external file needed) ──────────── */
@@ -43,18 +45,21 @@ export default function LiveCallModal({
   onEndCall,
   callId,
   initiator = true,
+  currentUserId,
+  onDeclineCall,
 }: LiveCallModalProps) {
-  const [callStatus, setCallStatus] = useState<'ringing' | 'connecting' | 'connected' | 'ended'>(
-    initiator ? 'ringing' : 'ringing',
-  );
+  const [callStatus, setCallStatus] = useState<'ringing' | 'connecting' | 'connected' | 'ended'>('ringing');
+  const [callError, setCallError] = useState('');
   const [duration, setDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(callType === 'audio');
   const [floatingReaction, setFloatingReaction] = useState<string | null>(null);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(false);
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const socketRef = useRef<ReturnType<typeof createRealtimeSocket> | null>(null);
@@ -63,6 +68,9 @@ export default function LiveCallModal({
   const targetUserId = (peer as User).id;
   const audioCtxRef = useRef<AudioContext | null>(null);
   const stopRingtoneRef = useRef<(() => void) | null>(null);
+  const pendingCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
+  const onEndCallRef = useRef(onEndCall);
+  useEffect(() => { onEndCallRef.current = onEndCall; }, [onEndCall]);
 
   const peerAvatar = getAvatarUrl(peer as User);
 
@@ -78,9 +86,13 @@ export default function LiveCallModal({
     };
   }, [callStatus]);
 
-  /* ─── Media & WebRTC (only after receiver answers) ──────────── */
+  /* ─── Media and WebRTC signaling ────────────────────────────── */
   const initWebRTC = useCallback(async () => {
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera and microphone access is unavailable in this browser context.');
+      }
+      if (!currentUserId || !targetUserId) throw new Error('Call participant identity is unavailable. Please retry.');
       const stream = await navigator.mediaDevices.getUserMedia({
         video:
           callType === 'video'
@@ -101,43 +113,71 @@ export default function LiveCallModal({
 
       pc.ontrack = (e) => {
         const [rs] = e.streams;
+        remoteStreamRef.current = rs || null;
         if (remoteVideoRef.current && rs) remoteVideoRef.current.srcObject = rs;
+        if (remoteAudioRef.current && rs) remoteAudioRef.current.srcObject = rs;
+      };
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') setCallStatus('connected');
+        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+          setCallError('The call connection was interrupted. Check your network and retry.');
+        }
       };
       pc.onicecandidate = (e) => {
         if (e.candidate) socket.emit('call:signal', { targetUserId, callId: callSessionId, signal: { candidate: e.candidate } });
       };
-      socket.on('call:signal', async ({ signal, fromUserId }: any) => {
-        if (fromUserId !== targetUserId) return;
-        if (signal?.candidate) await pc.addIceCandidate(signal.candidate);
+      socket.on('call:signal', async ({ signal, fromUserId }: { signal?: { candidate?: RTCIceCandidateInit; description?: RTCSessionDescriptionInit }; fromUserId?: string }) => {
+        if (fromUserId !== targetUserId || !signal) return;
+        if (signal.candidate) {
+          if (pc.remoteDescription) await pc.addIceCandidate(signal.candidate);
+          else pendingCandidatesRef.current.push(signal.candidate);
+        }
         if (signal?.description) {
           await pc.setRemoteDescription(signal.description);
+          for (const candidate of pendingCandidatesRef.current.splice(0)) {
+            await pc.addIceCandidate(candidate);
+          }
           if (signal.description.type === 'offer') {
             const ans = await pc.createAnswer();
             await pc.setLocalDescription(ans);
             socket.emit('call:signal', { targetUserId, callId: callSessionId, signal: { description: ans } });
-            setCallStatus('connected');
+          } else {
+            setCallStatus('connecting');
           }
         }
       });
-      socket.on('call:ended', onEndCall);
+      socket.on('call:ended', () => onEndCallRef.current());
       socket.on('connect', async () => {
         if (initiator) {
           socket.emit('call:invite', { targetUserId, callId: callSessionId, callType });
+          socket.emit('call:join', { callId: callSessionId });
+          setCallStatus('connecting');
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           socket.emit('call:signal', { targetUserId, callId: callSessionId, signal: { description: offer } });
         } else {
-          socket.emit('call:join', { callId: callSessionId, targetUserId });
+          socket.emit('call:join', { callId: callSessionId });
+          setCallStatus('connecting');
         }
       });
     } catch (err) {
-      console.warn('Media error:', err);
+      const message = err instanceof Error ? err.message : 'Could not access camera or microphone.';
+      setCallError(message);
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     }
-  }, [callType, callSessionId, targetUserId, initiator, onEndCall]);
+  }, [callType, callSessionId, targetUserId, currentUserId, initiator]);
+
+  useEffect(() => {
+    if (initiator) void initWebRTC();
+  }, [initiator, initWebRTC]);
 
   /* ─── Duration timer ───────────────────────────────────────── */
   useEffect(() => {
     if (callStatus !== 'connected') return;
+    if (streamRef.current && localVideoRef.current) localVideoRef.current.srcObject = streamRef.current;
+    if (remoteStreamRef.current && remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStreamRef.current;
+    if (remoteStreamRef.current && remoteAudioRef.current) remoteAudioRef.current.srcObject = remoteStreamRef.current;
     const id = setInterval(() => setDuration((d) => d + 1), 1000);
     return () => clearInterval(id);
   }, [callStatus]);
@@ -149,30 +189,21 @@ export default function LiveCallModal({
       audioCtxRef.current?.close();
       streamRef.current?.getTracks().forEach((t) => t.stop());
       peerConnectionRef.current?.close();
-      socketRef.current?.emit('call:end', { targetUserId, callId: callSessionId });
       socketRef.current?.disconnect();
     };
   }, [targetUserId, callSessionId]);
-
-  /* ─── Caller: simulate ringing → connecting ─────────────────── */
-  useEffect(() => {
-    if (!initiator) return;
-    // Caller gets connected after a delay (or when socket says peer answered)
-    const t = setTimeout(() => setCallStatus('connecting'), 30000); // 30s timeout
-    return () => clearTimeout(t);
-  }, [initiator]);
 
   /* ─── Helpers ────────────────────────────────────────────────── */
   const handleAnswer = async () => {
     stopRingtoneRef.current?.();
     setCallStatus('connecting');
     await initWebRTC();
-    setTimeout(() => setCallStatus('connected'), 1500);
   };
 
   const handleDecline = () => {
     stopRingtoneRef.current?.();
-    socketRef.current?.emit('call:end', { targetUserId, callId: callSessionId });
+    if (onDeclineCall) onDeclineCall();
+    else socketRef.current?.emit('call:end', { targetUserId, callId: callSessionId });
     onEndCall();
   };
 
@@ -219,6 +250,7 @@ export default function LiveCallModal({
           animation: 'zqFadeIn 0.3s ease-out forwards',
         }}
       >
+        {callError && <div role="alert" style={{ color: '#fff', textAlign: 'center', maxWidth: 440 }}>{callError}</div>}
         {/* Status pill */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
           <div
@@ -398,6 +430,7 @@ export default function LiveCallModal({
           animation: 'zqFadeIn 0.3s ease-out forwards',
         }}
       >
+        {callError && <div role="alert" style={{ color: '#fff', textAlign: 'center', maxWidth: 440 }}>{callError}</div>}
         {/* Header */}
         <div style={{ textAlign: 'center' }}>
           <div
@@ -560,6 +593,8 @@ export default function LiveCallModal({
           justifyContent: 'space-between',
         }}
       >
+          {callError && <div role="alert" style={{ color: '#fff', textAlign: 'center', maxWidth: 440 }}>{callError}</div>}
+          {callType === 'audio' && <audio ref={remoteAudioRef} autoPlay />}
         {/* Header */}
         <div style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%)', zIndex: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -648,7 +683,7 @@ export default function LiveCallModal({
           )}
 
           {/* Speaker toggle */}
-          <button type="button" onClick={() => setIsSpeakerOn((s) => !s)} style={{ width: '50px', height: '50px', borderRadius: '50%', background: isSpeakerOn ? 'rgba(0,223,216,0.2)' : 'rgba(255,255,255,0.1)', border: isSpeakerOn ? '1px solid #00dfd8' : '1px solid rgba(255,255,255,0.2)', color: isSpeakerOn ? '#00dfd8' : '#fff', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease' }} title="Speaker">
+          <button type="button" onClick={() => { const next = !isSpeakerOn; setIsSpeakerOn(next); if (remoteAudioRef.current) remoteAudioRef.current.muted = !next; if (remoteVideoRef.current) remoteVideoRef.current.muted = !next; }} style={{ width: '50px', height: '50px', borderRadius: '50%', background: isSpeakerOn ? 'rgba(0,223,216,0.2)' : 'rgba(255,255,255,0.1)', border: isSpeakerOn ? '1px solid #00dfd8' : '1px solid rgba(255,255,255,0.2)', color: isSpeakerOn ? '#00dfd8' : '#fff', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s ease' }} title={isSpeakerOn ? 'Mute speaker' : 'Unmute speaker'}>
             {isSpeakerOn ? '🔊' : '🔈'}
           </button>
 

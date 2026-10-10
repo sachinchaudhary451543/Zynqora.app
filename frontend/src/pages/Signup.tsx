@@ -83,6 +83,7 @@ export default function Signup() {
   return (
     <div className="zq-auth-container">
       <div className="zq-auth-card zq-auth-card-animated zq-signup-card">
+        <h1 className="zq-sr-only">Create your Zynqora account</h1>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
           <ZynqoraLogo size={44} />
           <ZynqoraWordmark />

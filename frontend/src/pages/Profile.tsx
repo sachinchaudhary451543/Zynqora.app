@@ -150,14 +150,7 @@ export default function Profile() {
     try {
       if (selectedFile) {
         const file = selectedFile;
-        const presign = await api.presignUpload(file.name, file.type);
-        let publicUrl = presign.publicUrl;
-        if (presign.method === 'PUT') {
-          await fetch(presign.uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
-        } else {
-          const res = await api.uploadLocal(file as File);
-          publicUrl = res.publicUrl;
-        }
+        const { publicUrl } = await api.uploadMedia(file);
         const updated = await api.updateProfile({ profileImage: publicUrl });
         const updatedWithCache = {
           ...updated,
@@ -209,7 +202,7 @@ export default function Profile() {
   const uploadBanner = async (file: File) => {
     setUploading(true);
     try {
-      const result = await api.uploadLocal(file);
+      const result = await api.uploadMedia(file);
       const updated = await api.updateProfile({ bannerImage: result.publicUrl });
       setProfile((current: any) => ({ ...current, bannerImage: updated.bannerImage }));
       setUserState?.(updated as any);
@@ -921,6 +914,7 @@ export default function Profile() {
         <LiveCallModal
           peer={activeCall.peer}
           callType={activeCall.type}
+          currentUserId={user?.id || ''}
           onEndCall={() => setActiveCall(null)}
         />
       )}

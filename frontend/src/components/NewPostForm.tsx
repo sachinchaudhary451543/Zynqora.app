@@ -24,16 +24,9 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
       let finalMediaUrl = mediaUrl || undefined;
       let finalMusicUrl = musicUrl || undefined;
       if (mediaFile) {
-        const presign = await api.presignUpload(mediaFile.name, mediaFile.type);
-        if (presign.method === 'PUT') {
-          await fetch(presign.uploadUrl, { method: 'PUT', body: mediaFile, headers: { 'Content-Type': mediaFile.type } });
-          finalMediaUrl = presign.publicUrl;
-        } else {
-          const res = await api.uploadLocal(mediaFile);
-          finalMediaUrl = res.publicUrl;
-        }
+        finalMediaUrl = (await api.uploadMedia(mediaFile)).publicUrl;
       }
-      if (musicFile) finalMusicUrl = (await api.uploadLocal(musicFile)).publicUrl;
+      if (musicFile) finalMusicUrl = (await api.uploadMedia(musicFile)).publicUrl;
 
       await api.createPost({ content: content || undefined, mediaUrl: finalMediaUrl || undefined, mediaType: mediaType || undefined, musicUrl: finalMusicUrl || undefined, musicType: finalMusicUrl ? 'audio' : undefined, visibility: 'TREE' });
       setContent('');
@@ -61,6 +54,7 @@ export default function NewPostForm({ onPosted }: { onPosted: () => void }) {
       </button>
       <div className="form-field">
         <textarea
+          aria-label="Write a new post"
           placeholder="Share a photo, video, or thought with your family and friends..."
           value={content}
           onChange={(e) => setContent(e.target.value)}
