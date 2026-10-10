@@ -9,19 +9,15 @@ export default function FloatingMessagesWidget() {
   const [suggestions, setSuggestions] = useState<User[]>([]);
 
   useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
     api.getSuggestions()
-      .then((data) => setSuggestions(data.slice(0, 5)))
+      .then((data) => {
+        if (!cancelled) setSuggestions(data.slice(0, 5));
+      })
       .catch(() => {});
-  }, []);
-
-  const sampleAvatars: Array<{ id: string; username: string; name: string; avatarUrl?: string | null; profileImage?: string | null }> =
-    suggestions.length > 0
-      ? suggestions.slice(0, 3)
-      : [
-          { id: '1', username: 'alex', name: 'Alex M', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop' },
-          { id: '2', username: 'sarah', name: 'Sarah S', avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop' },
-          { id: '3', username: 'mike', name: 'Mike W', avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop' },
-        ];
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   return (
     <div className="zq-floating-sync-bar">
@@ -113,11 +109,12 @@ export default function FloatingMessagesWidget() {
         <MessagesIcon size={18} active />
         <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '0.5px' }}>Quick Sync</span>
         <div style={{ display: 'flex', alignItems: 'center', marginLeft: '4px' }}>
-          {sampleAvatars.map((u, i) => (
+          {suggestions.slice(0, 3).map((u, i) => (
             <img
               key={u.id || i}
               src={getAvatarUrl(u)}
-              alt="avatar"
+              alt=""
+              loading="lazy"
               style={{
                 width: '24px',
                 height: '24px',

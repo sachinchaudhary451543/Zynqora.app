@@ -273,7 +273,10 @@ export class UploadsService {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const res = await fetch(url, { signal: controller.signal });
+      const res = await fetch(url, { signal: controller.signal, redirect: 'manual' });
+      if (res.status >= 300 && res.status < 400) {
+        throw new BadRequestException('Remote redirects are not allowed');
+      }
       if (!res.ok) throw new BadRequestException('Remote file could not be fetched');
 
       const contentLength = Number(res.headers.get('content-length') || 0);

@@ -7,7 +7,17 @@ async function main() {
   console.log('🌱 Seeding database...');
 
   // Clear existing data
+  await prisma.like.deleteMany();
+  await prisma.comment.deleteMany();
+  await prisma.story.deleteMany();
+  await prisma.notification.deleteMany();
+  await prisma.deviceToken.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.conversationParticipant.deleteMany();
+  await prisma.conversation.deleteMany();
   await prisma.post.deleteMany();
+  await prisma.circleMember.deleteMany();
+  await prisma.circle.deleteMany();
   await prisma.follow.deleteMany();
   await prisma.user.deleteMany();
 
@@ -67,6 +77,18 @@ async function main() {
 
   console.log(`✅ Created ${users.length} users`);
 
+  const circles = await Promise.all([
+    prisma.circle.create({ data: { slug: 'tech', name: 'Tech Innovators', icon: '🚀', description: 'Build, share, and learn with curious technologists.' } }),
+    prisma.circle.create({ data: { slug: 'family', name: 'Family Sanctuary', icon: '🏡', description: 'A quieter space for the people closest to you.' } }),
+    prisma.circle.create({ data: { slug: 'creative', name: 'Creative Studio', icon: '🎨', description: 'Ideas, visual experiments, and making things together.' } }),
+    prisma.circle.create({ data: { slug: 'gaming', name: 'Gaming Hub', icon: '🎮', description: 'Find teammates, share wins, and stay in the loop.' } }),
+    prisma.circle.create({ data: { slug: 'zen', name: 'Zen & Wellness', icon: '🌿', description: 'Small rituals and gentle accountability for your day.' } }),
+  ]);
+  await prisma.circleMember.createMany({
+    data: circles.flatMap((circle, index) => users.slice(0, Math.max(1, users.length - index)).map((user) => ({ circleId: circle.id, userId: user.id }))),
+  });
+  console.log(`✅ Created ${circles.length} circles and memberships`);
+
   // Create follows (Sarah follows everyone, John follows Emma and Mike, etc.)
   await prisma.follow.create({ data: { followerId: users[0].id, followingId: users[1].id } });
   await prisma.follow.create({ data: { followerId: users[0].id, followingId: users[2].id } });
@@ -117,7 +139,7 @@ async function main() {
       data: {
         authorId: users[4].id,
         content: 'Just finished this abstract piece! What do you think? 🎨',
-        mediaUrl: 'https://images.unsplash.com/photo-1579783902614-e3fb5141b0cb?w=600&h=400&fit=crop',
+        mediaUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&h=400&fit=crop',
         mediaType: 'image',
         visibility: 'FOLLOWERS',
       },

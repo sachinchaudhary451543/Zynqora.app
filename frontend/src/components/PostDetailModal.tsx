@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Post, Comment, api, getAvatarUrl, resolveMediaUrl } from '../api/client';
 import { NotificationsIcon, CommentIcon, ShareIcon, BookmarkIcon } from './Icons';
-import { HlsVideo } from './PostCard';
+import { HlsVideo } from './HlsVideo';
 
 interface PostDetailModalProps {
   post: Post | null;
@@ -15,6 +15,10 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const soundRef = useRef<HTMLAudioElement | null>(null);
+  const playbackHintTimer = useRef<number | undefined>(undefined);
+  const [showPlaybackHint, setShowPlaybackHint] = useState(false);
+  const [soundPlaying, setSoundPlaying] = useState(false);
 
   useEffect(() => {
     if (!post) return;
@@ -22,6 +26,8 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
     api.getComments(post.id)
       .then((res) => setComments(res.comments || []))
       .catch(() => {});
+    soundRef.current?.play().then(() => setSoundPlaying(true)).catch(() => {});
+    return () => window.clearTimeout(playbackHintTimer.current);
   }, [post]);
 
   if (!post) return null;
@@ -68,6 +74,22 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
   const ytEmbedUrl = getYouTubeEmbedUrl(post.mediaUrl);
   const authorAvatar = getAvatarUrl(post.author);
 
+  const toggleDetailMedia = () => {
+    const media = soundRef.current;
+    const video = document.querySelector('.ig-lightbox-media-col video') as HTMLVideoElement | null;
+    if (video) {
+      if (video.paused) video.play().catch(() => {});
+      else video.pause();
+    }
+    if (media) {
+      if (media.paused) media.play().then(() => setSoundPlaying(true)).catch(() => {});
+      else { media.pause(); setSoundPlaying(false); }
+    }
+    setShowPlaybackHint(true);
+    window.clearTimeout(playbackHintTimer.current);
+    playbackHintTimer.current = window.setTimeout(() => setShowPlaybackHint(false), 2000);
+  };
+
   return (
     <div className="ig-modal-overlay" onClick={onClose}>
       <button
@@ -89,7 +111,7 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
 
       <div className="ig-post-lightbox" onClick={(e) => e.stopPropagation()}>
         {/* Media Column */}
-        <div className="ig-lightbox-media-col">
+        <div className="ig-lightbox-media-col" onClick={toggleDetailMedia} role="button" tabIndex={0} aria-label="Play or pause post media">
           {ytEmbedUrl ? (
             <iframe
               src={ytEmbedUrl}
@@ -108,14 +130,17 @@ export default function PostDetailModal({ post, onClose, onPostUpdated }: PostDe
             /\.m3u8(?:[?#].*)?$/i.test(post.mediaUrl || '') ? (
               <HlsVideo src={resolveMediaUrl(post.mediaUrl) || ''} onError={() => {}} />
             ) : (
-              <video src={resolveMediaUrl(post.mediaUrl) || ''} controls autoPlay style={{ width: '100%', height: '100%' }} />
+              <video src={resolveMediaUrl(post.mediaUrl) || ''} autoPlay playsInline style={{ width: '100%', height: '100%' }} />
             )
           ) : (
             <img src={resolveMediaUrl(post.mediaUrl) || 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&fit=crop'} alt="Post media" />
           )}
+          {post.musicUrl && showPlaybackHint && (
+            <div className="zq-media-playback-hint" aria-hidden="true">{soundPlaying ? '❚❚' : '▶'}</div>
+          )}
         </div>
 
-        {post.musicUrl && <audio className="zq-detail-music" controls preload="metadata" src={resolveMediaUrl(post.musicUrl)} />}
+        {post.musicUrl && <audio ref={soundRef} className="zq-detail-sound" preload="auto" src={resolveMediaUrl(post.musicUrl)} aria-label="Post sound" />}
 
         {/* Info & Comments Column */}
         <div className="ig-lightbox-info-col">

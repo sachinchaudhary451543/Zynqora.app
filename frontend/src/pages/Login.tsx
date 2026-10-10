@@ -4,9 +4,11 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import { ZynqoraLogo, ZynqoraWordmark } from '../components/Icons';
 import AuthNotice from '../components/AuthNotice';
+import AuthPoweredBy from '../components/AuthPoweredBy';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,7 +24,7 @@ export default function Login() {
     e.preventDefault();
     setError('');
     if (!email.trim() || !password) { setError('Enter your email/username and password.'); return; }
-    if (email.includes('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Enter a valid email address or username.'); return; }
+    if (!email.trim().startsWith('@') && email.includes('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError('Enter a valid email address or username.'); return; }
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
     setLoading(true);
     try {
@@ -33,6 +35,11 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleSignIn = async (idToken: string) => {
+    await loginWithGoogle(idToken);
+    navigate('/feed');
   };
 
   const handleRecovery = async (e: React.FormEvent) => {
@@ -57,7 +64,7 @@ export default function Login() {
 
   return (
     <div className="zq-auth-container">
-      <div className="zq-auth-card">
+      <div className="zq-auth-card zq-auth-card-animated">
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', marginBottom: '24px' }}>
           <ZynqoraLogo size={44} />
           <ZynqoraWordmark />
@@ -66,42 +73,57 @@ export default function Login() {
           </p>
         </div>
 
-        {recovery ? <form onSubmit={resetToken ? handleReset : handleRecovery}>
-          <input type="text" className="zq-auth-input" placeholder="Account email or @username" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={Boolean(resetToken)} />
-          {!resetToken && <input type="text" className="zq-auth-input" placeholder="Private recovery code" value={recoveryCode} onChange={(e) => setRecoveryCode(e.target.value)} required />}
-          {resetToken && <input type="password" className="zq-auth-input" placeholder="New password (8+ characters)" value={resetPassword} onChange={(e) => setResetPassword(e.target.value)} required />}
-          {error && <AuthNotice type={noticeType}>{error}</AuthNotice>}
-          <button type="submit" className="zq-auth-btn" disabled={loading || !email || (!resetToken && !recoveryCode) || (Boolean(resetToken) && !resetPassword)}>{loading ? 'Processing...' : resetToken ? 'Reset Password' : 'Verify Recovery Code'}</button>
-          <button type="button" onClick={() => { setRecovery(false); setError(''); setResetToken(''); }} style={{ width: '100%', marginTop: 10, background: 'transparent', border: 0, color: 'var(--zq-text-secondary)', cursor: 'pointer' }}>Back to login</button>
-        </form> : <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            className="zq-auth-input"
-            placeholder="Account Email or @username"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            className="zq-auth-input"
-            placeholder="Security Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+        {recovery ? (
+          <form onSubmit={resetToken ? handleReset : handleRecovery}>
+            <input type="text" className="zq-auth-input" placeholder="Account email or @username" value={email} onChange={(e) => setEmail(e.target.value)} required disabled={Boolean(resetToken)} />
+            {!resetToken && <input type="text" className="zq-auth-input" placeholder="Private recovery code" value={recoveryCode} onChange={(e) => setRecoveryCode(e.target.value)} required />}
+            {resetToken && <input type="password" className="zq-auth-input" placeholder="New password (8+ characters)" value={resetPassword} onChange={(e) => setResetPassword(e.target.value)} required />}
+            {error && <AuthNotice type={noticeType}>{error}</AuthNotice>}
+            <button type="submit" className="zq-auth-btn" disabled={loading || !email || (!resetToken && !recoveryCode) || (Boolean(resetToken) && !resetPassword)}>{loading ? 'Processing...' : resetToken ? 'Reset Password' : 'Verify Recovery Code'}</button>
+            <button type="button" onClick={() => { setRecovery(false); setError(''); setResetToken(''); }} style={{ width: '100%', marginTop: 10, background: 'transparent', border: 0, color: 'var(--zq-text-secondary)', cursor: 'pointer' }}>Back to login</button>
+          </form>
+        ) : (
+          <>
+            <form onSubmit={handleSubmit}>
+              <input
+                autoComplete="username"
+                name="username"
+                type="text"
+                maxLength={254}
+                aria-label="Account email or username"
+                className="zq-auth-input"
+                placeholder="Account Email or @username"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <input
+                autoComplete="current-password"
+                name="password"
+                type="password"
+                maxLength={128}
+                aria-label="Password"
+                className="zq-auth-input"
+                placeholder="Security Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
 
-          {error && <AuthNotice type={noticeType}>{error}</AuthNotice>}
+              {error && <AuthNotice type={noticeType}>{error}</AuthNotice>}
 
-          <button
-            type="submit"
-            className="zq-auth-btn"
-            disabled={loading || !email || !password}
-          >
-            {loading ? 'Synchronizing...' : '⚡ Enter Zynqora'}
-          </button>
-        </form>
-        }
+              <button
+                type="submit"
+                className="zq-auth-btn"
+                disabled={loading || !email || !password}
+              >
+                {loading ? 'Synchronizing...' : '⚡ Enter Zynqora'}
+              </button>
+            </form>
+            <div className="zq-auth-divider"><span>or</span></div>
+            <GoogleSignInButton onSignIn={handleGoogleSignIn} onError={setError} />
+          </>
+        )}
 
         {!recovery && <button type="button" onClick={() => { setRecovery(true); setError(''); }} style={{ marginTop: 12, background: 'transparent', border: 0, color: 'var(--zq-accent-cyan)', cursor: 'pointer', fontSize: 12 }}>Forgot password?</button>}
 
@@ -111,6 +133,7 @@ export default function Login() {
             Create Your Circle
           </Link>
         </div>
+        <AuthPoweredBy />
       </div>
     </div>
   );

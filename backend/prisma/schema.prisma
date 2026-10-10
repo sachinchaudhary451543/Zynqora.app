@@ -11,6 +11,7 @@ model User {
   id           String   @id @default(uuid())
   email        String   @unique
   username     String   @unique
+  googleSubject String? @unique
   passwordHash String
   name         String
   bio          String?
@@ -20,11 +21,18 @@ model User {
   website      String?
   category     String?
   note         String?
+  interests    String[] @default([])
+  notifySocialActivity Boolean @default(true)
+  notifyCircleActivity Boolean @default(true)
+  weeklyDigestEnabled Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now()) @updatedAt
   resetToken   String?
   resetTokenExpiresAt DateTime?
+  refreshTokenHash String?
+  refreshTokenExpiresAt DateTime?
   recoveryCodeHash String?
+  tokenVersion Int @default(0)
 
   // Privacy settings
   profileVisibility     String @default("PUBLIC")      // PUBLIC, FOLLOWERS_ONLY, PRIVATE
@@ -41,6 +49,174 @@ model User {
   messages     Message[]
   notificationsReceived Notification[] @relation("NotificationRecipient")
   notificationsSent     Notification[] @relation("NotificationActor")
+  deviceTokens          DeviceToken[]
+  circleMemberships     CircleMember[]
+  createdCircleEvents  CircleEvent[] @relation("CircleEventCreator")
+  pinnedCirclePosts    CirclePinnedPost[] @relation("CirclePostPinner")
+  promptParticipations CirclePromptParticipant[]
+  circleEventParticipations CircleEventParticipant[]
+}
+
+model GoogleAuthChallenge {
+  id        String   @id @default(uuid())
+  nonceHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  platform  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Circle {
+  id          String        @id @default(uuid())
+  slug        String        @unique
+  name        String
+  category    String        @default("community")
+  description String?
+  icon        String?
+  createdAt   DateTime      @default(now())
+  members     CircleMember[]
+  posts       Post[]
+  events      CircleEvent[]
+  pinnedPosts CirclePinnedPost[]
+  prompts     CirclePrompt[]
+}
+
+model CircleMember {
+  id       String   @id @default(uuid())
+  circleId String
+  userId   String
+  role     String   @default("MEMBER")
+  joinedAt DateTime @default(now())
+
+  circle Circle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([circleId, userId])
+  @@index([userId])
+}
+
+model CircleEvent {
+  id          String   @id @default(uuid())
+  circleId    String
+  creatorId   String
+  kind        String   @default("EVENT")
+  mode        String   @default("IN_PERSON")
+  gameMode    String   @default("EXTERNAL")
+  templateId  String?
+  title       String
+  description String?
+  startsAt    DateTime
+  location    String?
+  gameUrl     String?
+  capacity    Int?
+  durationMinutes Int?
+  tournamentFormat String?
+  createdAt   DateTime @default(now())
+
+  circle       Circle                    @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  creator      User                      @relation("CircleEventCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  participants CircleEventParticipant[]
+  gameRounds  CircleEventGameRound[]
+
+  @@index([circleId, startsAt])
+  @@index([circleId, templateId, createdAt])
+}
+
+model CircleEventGameRound {
+  id          String   @id @default(uuid())
+  eventId     String
+  position    Int
+  prompt      String
+  choices     Json
+  answerIndex Int
+  event       CircleEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, position])
+}
+
+model CircleEventParticipant {
+  id            String   @id @default(uuid())
+  eventId       String
+  userId        String
+  joinedAt      DateTime @default(now())
+
+  event CircleEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameSubmission CircleEventGameSubmission?
+
+  @@unique([eventId, userId])
+  @@index([userId, joinedAt])
+}
+
+model CircleEventGameSubmission {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    String
+  score     Int
+  submittedAt DateTime @default(now())
+
+  participant CircleEventParticipant @relation(fields: [eventId, userId], references: [eventId, userId], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId, score, submittedAt])
+}
+
+model CirclePinnedPost {
+  id        String   @id @default(uuid())
+  circleId  String
+  postId    String
+  pinnedById String
+  createdAt DateTime @default(now())
+
+  circle  Circle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  post    Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  pinnedBy User  @relation("CirclePostPinner", fields: [pinnedById], references: [id], onDelete: Cascade)
+
+  @@unique([circleId, postId])
+  @@index([circleId, createdAt])
+}
+
+model CirclePrompt {
+  id           String   @id @default(uuid())
+  circleId     String
+  slug         String   @unique
+  title        String
+  body         String
+  category     String
+  weekStartsAt DateTime
+  endsAt       DateTime
+  createdAt    DateTime @default(now())
+
+  circle       Circle                    @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  participants CirclePromptParticipant[]
+
+  @@index([circleId, weekStartsAt])
+}
+
+model CirclePromptParticipant {
+  id        String   @id @default(uuid())
+  promptId  String
+  userId    String
+  joinedAt  DateTime @default(now())
+
+  prompt CirclePrompt @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([promptId, userId])
+  @@index([userId])
 }
 
 model Follow {
@@ -53,6 +229,7 @@ model Follow {
   following User @relation("following", fields: [followingId], references: [id])
 
   @@unique([followerId, followingId])
+  @@index([followerId, createdAt])
   @@index([followingId])
 }
 
@@ -68,6 +245,7 @@ model Notification {
   recipient User @relation("NotificationRecipient", fields: [recipientId], references: [id])
   actor     User @relation("NotificationActor", fields: [actorId], references: [id])
 
+  @@index([recipientId, read, createdAt])
   @@index([recipientId, createdAt])
 }
 
@@ -83,13 +261,18 @@ model Post {
   musicUrl   String?
   musicType  String?        // "audio"
   visibility String         @default("FOLLOWERS")
+  circleId   String?
   createdAt  DateTime       @default(now())
 
   author   User      @relation(fields: [authorId], references: [id])
+  circle   Circle?   @relation(fields: [circleId], references: [id], onDelete: SetNull)
+  circlePins CirclePinnedPost[]
   likes    Like[]
   comments Comment[]
 
+  @@index([createdAt])
   @@index([authorId, createdAt])
+  @@index([circleId, createdAt])
 }
 
 model Like {
@@ -102,6 +285,7 @@ model Like {
   user User @relation("UserLikes", fields: [userId], references: [id])
 
   @@unique([postId, userId])
+  @@index([createdAt])
   @@index([postId])
   @@index([userId])
 }
@@ -116,7 +300,8 @@ model Comment {
   post   Post @relation(fields: [postId], references: [id])
   author User @relation("UserComments", fields: [authorId], references: [id])
 
-  @@index([postId])
+  @@index([createdAt])
+  @@index([postId, createdAt])
   @@index([authorId])
 }
 
@@ -152,6 +337,7 @@ model ConversationParticipant {
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   user           User @relation(fields: [userId], references: [id])
 
+  @@unique([conversationId, userId])
   @@index([conversationId])
   @@index([userId])
 }
@@ -166,6 +352,7 @@ model Message {
   conversation Conversation @relation(fields: [conversationId], references: [id])
   sender       User @relation(fields: [senderId], references: [id])
 
+  @@index([conversationId, createdAt])
   @@index([conversationId])
   @@index([senderId])
 }

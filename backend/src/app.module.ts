@@ -12,6 +12,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { ChatModule } from './chat/chat.module';
 import { HealthController } from './health.controller';
 import { RealtimeModule } from './realtime/realtime.module';
+import { CirclesModule } from './circles/circles.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     UploadsModule,
     ChatModule,
     RealtimeModule,
+    CirclesModule,
   ],
   controllers: [HealthController],
 })

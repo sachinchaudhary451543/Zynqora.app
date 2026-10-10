@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AuraSparkIcon } from './Icons';
 import { getDefaultAvatar, getAvatarUrl, resolveMediaUrl } from '../api/client';
-import { HlsVideo } from './PostCard';
+import { HlsVideo } from './HlsVideo';
 
 interface StoryItem {
   id: string;

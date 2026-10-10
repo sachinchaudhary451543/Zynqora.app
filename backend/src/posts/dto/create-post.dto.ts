@@ -25,4 +25,8 @@ export class CreatePostDto {
   @IsOptional()
   @IsIn(['CIRCLE', 'TREE', 'FOLLOWERS'])
   visibility?: 'CIRCLE' | 'TREE' | 'FOLLOWERS';
+
+  @IsOptional()
+  @IsString()
+  circleId?: string;
 }

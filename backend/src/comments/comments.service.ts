@@ -27,6 +27,7 @@ export class CommentsService {
     const comments = await this.prisma.comment.findMany({
       where: { postId },
       orderBy: { createdAt: 'desc' },
+      take: 100,
       include: {
         author: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } },
       },

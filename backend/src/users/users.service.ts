@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { normalizeProfileVisibility } from '../common/social-access';
+import { buildCursorPageArgs } from '../common/pagination';
 
 @Injectable()
 export class UsersService {
@@ -83,6 +84,65 @@ export class UsersService {
     });
   }
 
+  async getPreferences(userId: string) {
+    return this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        interests: true,
+        notifySocialActivity: true,
+        notifyCircleActivity: true,
+        weeklyDigestEnabled: true,
+      },
+    });
+  }
+
+  async updatePreferences(userId: string, data: {
+    interests?: string[];
+    notifySocialActivity?: boolean;
+    notifyCircleActivity?: boolean;
+    weeklyDigestEnabled?: boolean;
+  }) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        interests: data.interests,
+        notifySocialActivity: data.notifySocialActivity,
+        notifyCircleActivity: data.notifyCircleActivity,
+        weeklyDigestEnabled: data.weeklyDigestEnabled,
+      },
+      select: {
+        interests: true,
+        notifySocialActivity: true,
+        notifyCircleActivity: true,
+        weeklyDigestEnabled: true,
+      },
+    });
+  }
+
+  async deleteAccount(userId: string) {
+    await this.prisma.$transaction(async (tx: any) => {
+      await tx.comment.deleteMany({ where: { authorId: userId } });
+      await tx.like.deleteMany({ where: { userId } });
+      await tx.story.deleteMany({ where: { authorId: userId } });
+      await tx.message.deleteMany({ where: { senderId: userId } });
+      await tx.conversationParticipant.deleteMany({ where: { userId } });
+      await tx.notification.deleteMany({ where: { OR: [{ actorId: userId }, { recipientId: userId }] } });
+      await tx.follow.deleteMany({ where: { OR: [{ followerId: userId }, { followingId: userId }] } });
+
+      const posts = await tx.post.findMany({ where: { authorId: userId }, select: { id: true } });
+      if (posts.length) {
+        const postIds = posts.map((post: { id: string }) => post.id);
+        await tx.comment.deleteMany({ where: { postId: { in: postIds } } });
+        await tx.like.deleteMany({ where: { postId: { in: postIds } } });
+        await tx.post.deleteMany({ where: { id: { in: postIds } } });
+      }
+
+      await tx.user.delete({ where: { id: userId } });
+    });
+
+    return { deleted: true };
+  }
+
   async follow(followerId: string, targetUsername: string) {
     const target = await this.prisma.user.findUnique({ where: { username: targetUsername } });
     if (!target) throw new NotFoundException('User not found');
@@ -110,12 +170,54 @@ export class UsersService {
   }
 
   async getNotifications(userId: string) {
-    return this.prisma.notification.findMany({
+    const preferences = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { notifySocialActivity: true, notifyCircleActivity: true },
+    });
+    const notifications = await this.prisma.notification.findMany({
       where: { recipientId: userId },
       orderBy: { createdAt: 'desc' },
-      take: 30,
+      take: 100,
       include: { actor: { select: { username: true, name: true, avatarUrl: true, profileImage: true } } },
     });
+    return notifications
+      .filter((notification) => notification.type === 'CIRCLE_EVENT'
+        ? preferences.notifyCircleActivity
+        : preferences.notifySocialActivity)
+      .slice(0, 30);
+  }
+
+  async getWeeklyDigest(userId: string) {
+    const preferences = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { weeklyDigestEnabled: true },
+    });
+    if (!preferences.weeklyDigestEnabled) throw new ForbiddenException('Enable the weekly recap in notification settings first');
+    const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const notifications = await this.prisma.notification.findMany({
+      where: { recipientId: userId, createdAt: { gte: from } },
+      select: { type: true },
+    });
+    return {
+      from,
+      to: new Date(),
+      socialActivity: notifications.filter((item) => item.type !== 'CIRCLE_EVENT').length,
+      circleActivity: notifications.filter((item) => item.type === 'CIRCLE_EVENT').length,
+    };
+  }
+
+  async registerDeviceToken(userId: string, data: { token: string; platform: 'android' | 'ios' }) {
+    return this.prisma.deviceToken.upsert({
+      where: { token: data.token },
+      create: { userId, token: data.token, platform: data.platform },
+      update: { userId, platform: data.platform },
+      select: { id: true, token: true, platform: true },
+    });
+  }
+
+  async removeDeviceToken(userId: string, token: string) {
+    await this.prisma.deviceToken.deleteMany({ where: { userId, token } });
+    return { removed: true };
   }
 
   async unfollow(followerId: string, targetUsername: string) {
@@ -129,28 +231,31 @@ export class UsersService {
     return { following: false };
   }
 
-  async getFollowers(username: string, viewerId?: string) {
+  async getFollowers(username: string, viewerId?: string, cursor?: string, limit = 20) {
     const target = await this.prisma.user.findUnique({
       where: { username },
       select: { id: true, followersVisibility: true },
     });
     if (!target) throw new NotFoundException('User not found');
+    const page = buildCursorPageArgs({ cursor, limit, maxLimit: 50 });
+
+    const list = async (where: any) => {
+      const rows = await this.prisma.follow.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        ...page,
+        include: { follower: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } } },
+      });
+      return Object.assign(rows, { nextCursor: rows.length === page.take ? rows[rows.length - 1].id : null });
+    };
 
     // Owner can see
     if (viewerId && viewerId === target.id) {
-      return this.prisma.follow.findMany({
-        where: { followingId: target.id },
-        orderBy: { createdAt: 'desc' },
-        include: { follower: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } } },
-      });
+      return list({ followingId: target.id });
     }
 
     if (target.followersVisibility === 'PUBLIC') {
-      return this.prisma.follow.findMany({
-        where: { followingId: target.id },
-        orderBy: { createdAt: 'desc' },
-        include: { follower: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } } },
-      });
+      return list({ followingId: target.id });
     }
 
     if (target.followersVisibility === 'FOLLOWERS_ONLY') {
@@ -159,11 +264,7 @@ export class UsersService {
         where: { followerId_followingId: { followerId: viewerId, followingId: target.id } },
       });
       if (relation) {
-        return this.prisma.follow.findMany({
-          where: { followingId: target.id },
-          orderBy: { createdAt: 'desc' },
-          include: { follower: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } } },
-        });
+        return list({ followingId: target.id });
       }
       throw new ForbiddenException('Followers list is visible to followers only');
     }
@@ -171,28 +272,31 @@ export class UsersService {
     throw new ForbiddenException('Followers list is private');
   }
 
-  async getFollowing(username: string, viewerId?: string) {
+  async getFollowing(username: string, viewerId?: string, cursor?: string, limit = 20) {
     const target = await this.prisma.user.findUnique({
       where: { username },
       select: { id: true, followingVisibility: true },
     });
     if (!target) throw new NotFoundException('User not found');
+    const page = buildCursorPageArgs({ cursor, limit, maxLimit: 50 });
+
+    const list = async (where: any) => {
+      const rows = await this.prisma.follow.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        ...page,
+        include: { following: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } } },
+      });
+      return Object.assign(rows, { nextCursor: rows.length === page.take ? rows[rows.length - 1].id : null });
+    };
 
     // Owner can see
     if (viewerId && viewerId === target.id) {
-      return this.prisma.follow.findMany({
-        where: { followerId: target.id },
-        orderBy: { createdAt: 'desc' },
-        include: { following: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } } },
-      });
+      return list({ followerId: target.id });
     }
 
     if (target.followingVisibility === 'PUBLIC') {
-      return this.prisma.follow.findMany({
-        where: { followerId: target.id },
-        orderBy: { createdAt: 'desc' },
-        include: { following: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } } },
-      });
+      return list({ followerId: target.id });
     }
 
     if (target.followingVisibility === 'FOLLOWERS_ONLY') {
@@ -201,11 +305,7 @@ export class UsersService {
         where: { followerId_followingId: { followerId: viewerId, followingId: target.id } },
       });
       if (relation) {
-        return this.prisma.follow.findMany({
-          where: { followerId: target.id },
-          orderBy: { createdAt: 'desc' },
-          include: { following: { select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true } } },
-        });
+        return list({ followerId: target.id });
       }
       throw new ForbiddenException('Following list is visible to followers only');
     }

@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { ChatService } from './chat.service';
+import { CreateMessageDto } from './dto/create-message.dto';
 
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
@@ -14,18 +15,18 @@ export class ChatController {
   }
 
   @Get('conversations')
-  getConversations(@CurrentUser() user: { userId: string }) {
-    return this.chatService.getConversations(user.userId);
+  getConversations(@CurrentUser() user: { userId: string }, @Query('cursor') cursor?: string, @Query('limit') limit?: string) {
+    return this.chatService.getConversations(user.userId, cursor, Number(limit) || 20);
   }
 
   @Post('conversation/:id/messages')
-  postMessage(@CurrentUser() user: { userId: string }, @Param('id') id: string, @Body() body: { content: string }) {
+  postMessage(@CurrentUser() user: { userId: string }, @Param('id') id: string, @Body() body: CreateMessageDto) {
     return this.chatService.postMessage(id, user.userId, body.content);
   }
 
   @Get('conversation/:id/messages')
-  getMessages(@CurrentUser() user: { userId: string }, @Param('id') id: string) {
-    return this.chatService.getMessages(id, user.userId);
+  getMessages(@CurrentUser() user: { userId: string }, @Param('id') id: string, @Query('after') after?: string) {
+    return this.chatService.getMessages(id, user.userId, after);
   }
 
   @Post('conversation/:id/request/:status')
