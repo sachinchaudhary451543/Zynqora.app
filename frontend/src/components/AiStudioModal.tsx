@@ -1,792 +1,298 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { api, getAvatarUrl } from '../api/client';
-import { AuraSparkIcon } from './Icons';
 
-interface AiStudioModalProps {
-  currentAvatarUrl?: string;
-  onClose: () => void;
-  onApplyAvatar: (publicUrl: string) => void;
-}
+type StudioTab = 'generate' | 'remaster';
+type Persona = 'male' | 'female' | 'neutral' | 'cyborg';
+
+const styles = [
+  { id: 'realistic', label: 'Natural', detail: 'Photographic portrait' },
+  { id: 'studio', label: 'Studio', detail: 'Soft light, clean backdrop' },
+  { id: 'cyberpunk', label: 'Cyberpunk', detail: 'Neon-lit future' },
+  { id: 'anime', label: 'Illustrated', detail: 'Expressive digital art' },
+  { id: 'cosmic', label: 'Cosmic', detail: 'Celestial atmosphere' },
+  { id: 'solar', label: 'Golden hour', detail: 'Warm sunset light' },
+] as const;
+
+const suggestions = [
+  'A confident creator in a sunlit modern studio',
+  'A cinematic portrait with a deep blue city at night',
+  'An editorial portrait with warm golden-hour lighting',
+  'A playful illustrated avatar with a vivid color palette',
+];
+
+const remasterPresets = [
+  { label: 'Studio retouch', prompt: 'Improve soft studio lighting and clarity while keeping my face natural.', style: 'studio' },
+  { label: 'Night city', prompt: 'Add tasteful neon city lights in the background and cinematic contrast.', style: 'cyberpunk' },
+  { label: 'Warm portrait', prompt: 'Create a warm golden-hour portrait with soft natural light.', style: 'solar' },
+  { label: 'Illustrated', prompt: 'Turn this into expressive polished digital illustration while retaining recognizable features.', style: 'anime' },
+] as const;
 
 export default function AiStudioModal({
   currentAvatarUrl,
   onClose,
   onApplyAvatar,
-}: AiStudioModalProps) {
-  const [activeTab, setActiveTab] = useState<'generate' | 'remaster'>('generate');
-  
-  // Generate Tab State
+}: {
+  currentAvatarUrl?: string;
+  onClose: () => void;
+  onApplyAvatar: (publicUrl: string) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<StudioTab>('generate');
   const [prompt, setPrompt] = useState('');
-  const [gender, setGender] = useState<'male' | 'female' | 'neutral' | 'cyborg'>('male');
+  const [persona, setPersona] = useState<Persona>('neutral');
   const [style, setStyle] = useState('realistic');
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [genError, setGenError] = useState('');
-
-  // Remaster / Modify Tab State
-  const [sourceImageUrl, setSourceImageUrl] = useState<string>(currentAvatarUrl || getAvatarUrl(null));
+  const [sourceImageUrl, setSourceImageUrl] = useState(currentAvatarUrl || getAvatarUrl(null));
+  const [sourceHasError, setSourceHasError] = useState(false);
   const [modifyPrompt, setModifyPrompt] = useState('');
-  const [modifyGender, setModifyGender] = useState<'male' | 'female' | 'neutral' | 'cyborg'>('male');
-  const [modifyStyle, setModifyStyle] = useState('cyberpunk');
+  const [modifyStyle, setModifyStyle] = useState('studio');
   const [remasteredUrl, setRemasteredUrl] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isRemastering, setIsRemastering] = useState(false);
-  const [remasterError, setRemasterError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const active = isGenerating || isRemastering || isUploading;
+  const hasUsableSource = /^https?:\/\//i.test(sourceImageUrl) && !sourceHasError;
+  const resultUrl = activeTab === 'generate' ? generatedUrl : remasteredUrl;
 
-  const genderOptions = [
-    { id: 'male', label: '👨 Male / Guy', desc: 'Handsome male persona' },
-    { id: 'female', label: '👩 Female / Woman', desc: 'Beautiful female persona' },
-    { id: 'cyborg', label: '🤖 Cyberpunk Cyborg', desc: 'Futuristic sci-fi techie' },
-    { id: 'neutral', label: '🧑 Neutral / Unisex', desc: 'Visionary creator persona' },
-  ];
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !active) onClose();
+      if (event.key !== 'Tab') return;
+      const items = dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), textarea:not([disabled]), input:not([disabled])');
+      if (!items?.length) return;
+      if (event.shiftKey && document.activeElement === items[0]) {
+        event.preventDefault();
+        items[items.length - 1].focus();
+      } else if (!event.shiftKey && document.activeElement === items[items.length - 1]) {
+        event.preventDefault();
+        items[0].focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [active, onClose]);
 
-  const styleOptions = [
-    { id: 'realistic', name: '📸 Photorealistic', icon: '📸', desc: 'Masterpiece 8k studio photography' },
-    { id: 'cyberpunk', name: '⚡ Cyberpunk Aura', icon: '⚡', desc: 'Neon obsidian holographic tech' },
-    { id: 'anime', name: '🎨 3D Anime / Pixar', icon: '🎨', desc: 'Vibrant Makoto Shinkai 3D digital art' },
-    { id: 'cosmic', name: '🪐 Cosmic Ethereal', icon: '🪐', desc: 'Glowing stardust & nebula particles' },
-    { id: 'studio', name: '🕶️ Studio Minimalist', icon: '🕶️', desc: 'Dramatic 85mm softbox headshot' },
-    { id: 'solar', name: '🔥 Solar Warmth', icon: '🔥', desc: 'Sun-drenched golden hour lens flare' },
-  ];
-
-  const promptSuggestions = [
-    'Software engineer in high-tech glass obsidian lab with subtle cyan aura lighting',
-    'Cinematic 8k portrait of young visionary creator with glowing purple neon reflection',
-    'Cyberpunk anime pioneer with sleek neural visor and volumetric ambient light',
-    'Minimalist monochromatic black and white editorial magazine cover portrait',
-  ];
-
-  const handleGenerate = async () => {
+  const generate = async () => {
+    setError('');
+    setNotice('');
+    setGeneratedUrl(null);
     setIsGenerating(true);
-    setGenError('');
     try {
-      const res = await api.aiGenerateRealistic({
-        prompt: prompt || 'modern software engineer in high-tech obsidian laboratory with subtle neon aura lighting',
+      const result = await api.aiGenerateRealistic({
+        prompt: prompt.trim(),
         style,
-        gender,
+        gender: persona,
       });
-      setGeneratedUrl(res.publicUrl);
-    } catch (e: any) {
-      setGenError(e.message || 'Failed to synthesize AI image. Please try again.');
+      if (!result.publicUrl) throw new Error('The image service returned no image. Please try again.');
+      setGeneratedUrl(result.publicUrl);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Image generation failed. Please try again.');
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleRemaster = async () => {
+  const remaster = async () => {
+    if (!hasUsableSource) {
+      setError('Upload a photo first. Your current profile photo is unavailable for remastering.');
+      return;
+    }
+    setError('');
+    setNotice('');
+    setRemasteredUrl(null);
     setIsRemastering(true);
-    setRemasterError('');
     try {
-      const res = await api.aiModifyImage({
+      const result = await api.aiModifyImage({
         imageUrl: sourceImageUrl,
-        prompt: modifyPrompt || 'Remaster with cinematic volumetric lighting, neon aura, and ultra-sharp 8k details',
+        prompt: modifyPrompt.trim() || 'Improve the portrait lighting and detail while keeping my recognizable features.',
         style: modifyStyle,
-        gender: modifyGender,
+        gender: persona,
       });
-      setRemasteredUrl(res.publicUrl);
-    } catch (e: any) {
-      setRemasterError(e.message || 'Failed to remaster photo. Please try again.');
+      if (!result.publicUrl) throw new Error('The image service returned no image. Please try again.');
+      setRemasteredUrl(result.publicUrl);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Photo remaster failed. Please try again.');
     } finally {
       setIsRemastering(false);
     }
   };
 
-  const handlePickCustomPhoto = async (file: File) => {
+  const uploadSource = async (file: File) => {
+    setError('');
+    setNotice('');
+    setRemasteredUrl(null);
+    if (!file.type.startsWith('image/')) {
+      setError('Choose an image file such as JPG, PNG, or WebP.');
+      return;
+    }
+    setIsUploading(true);
     try {
-      const res = await api.uploadMedia(file);
-      setSourceImageUrl(res.publicUrl);
-      setRemasteredUrl(null);
-    } catch (e: any) {
-      setRemasterError('Failed to upload custom photo for remastering.');
+      const uploaded = await api.uploadMedia(file);
+      setSourceImageUrl(uploaded.publicUrl);
+      setSourceHasError(false);
+      setNotice('Photo uploaded. Describe a change or choose a preset, then select Remaster photo.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not upload this photo. Please try again.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
-  return (
+  const applyResult = async () => {
+    if (resultUrl) await onApplyAvatar(resultUrl);
+  };
+
+  return createPortal(
     <div
       className="zq-ai-studio-overlay"
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
-        background: 'rgba(4, 6, 14, 0.85)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !active) onClose();
       }}
     >
       <div
-        className="zq-ai-studio-modal"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'linear-gradient(180deg, #13172c 0%, #090b16 100%)',
-          border: '1px solid rgba(0, 223, 216, 0.35)',
-          borderRadius: '28px',
-          width: '100%',
-          maxWidth: '840px',
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: '0 32px 84px rgba(0, 0, 0, 0.9), 0 0 60px rgba(0, 223, 216, 0.18)',
-          animation: 'zqZoomIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-        }}
+        ref={dialogRef}
+        className="zq-ai-studio-modal zq-ai-studio-redesign"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="zq-ai-studio-title"
+        aria-describedby="zq-ai-studio-description"
       >
-        {/* Header */}
-        <div
-          style={{
-            padding: '20px 28px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'rgba(255, 255, 255, 0.02)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '14px',
-                background: 'linear-gradient(135deg, #00dfd8 0%, #7928ca 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                boxShadow: '0 4px 16px rgba(0, 223, 216, 0.4)',
-              }}
-            >
-              <AuraSparkIcon size={22} active={true} />
-            </div>
+        <header className="zq-ai-studio-header">
+          <div className="zq-ai-studio-brand">
+            <span className="zq-ai-studio-mark" aria-hidden="true">✳</span>
             <div>
-              <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '0.4px' }}>
-                Zynqora AI Creative Studio
-              </h3>
-              <p style={{ fontSize: '12px', color: '#9499ab', margin: '2px 0 0 0' }}>
-                Neural avatar generator & prompt-based photo enhancement
-              </p>
+              <span className="zq-ai-studio-eyebrow">ZYNQORA CREATIVE</span>
+              <h2 id="zq-ai-studio-title">AI Studio</h2>
+              <p id="zq-ai-studio-description">Make a new portrait or give a photo a fresh look.</p>
             </div>
           </div>
+          <button ref={closeButtonRef} className="zq-ai-studio-close" type="button" aria-label="Close AI Studio" onClick={onClose} disabled={active}>×</button>
+        </header>
 
-          <button
-            onClick={onClose}
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: '#aaa',
-              width: '34px',
-              height: '34px',
-              borderRadius: '50%',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '14px',
-              transition: 'all 0.2s',
-            }}
-          >
-            ✕
+        <div className="zq-ai-studio-tabs" role="tablist" aria-label="AI Studio mode">
+          <button type="button" role="tab" aria-selected={activeTab === 'generate'} className={activeTab === 'generate' ? 'active' : ''} onClick={() => { setActiveTab('generate'); setError(''); }}>
+            <span>01</span> Create from a prompt
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab === 'remaster'} className={activeTab === 'remaster' ? 'active' : ''} onClick={() => { setActiveTab('remaster'); setError(''); }}>
+            <span>02</span> Edit a photo
           </button>
         </div>
 
-        {/* Studio Mode Segmented Switcher */}
-        <div style={{ padding: '14px 28px 0 28px' }}>
-          <div
-            style={{
-              display: 'flex',
-              background: 'rgba(0, 0, 0, 0.4)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '16px',
-              padding: '4px',
-              gap: '6px',
-            }}
-          >
-            <button
-              onClick={() => setActiveTab('generate')}
-              style={{
-                flex: 1,
-                padding: '10px 16px',
-                borderRadius: '12px',
-                border: activeTab === 'generate' ? '1px solid rgba(0, 223, 216, 0.5)' : '1px solid transparent',
-                background: activeTab === 'generate' ? 'linear-gradient(135deg, rgba(0, 223, 216, 0.2), rgba(121, 40, 202, 0.25))' : 'transparent',
-                color: activeTab === 'generate' ? '#fff' : '#8892b0',
-                fontWeight: 800,
-                fontSize: '13px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
-            >
-              <span>✨</span> Create from Prompt (Text-to-Avatar)
-            </button>
-            <button
-              onClick={() => setActiveTab('remaster')}
-              style={{
-                flex: 1,
-                padding: '10px 16px',
-                borderRadius: '12px',
-                border: activeTab === 'remaster' ? '1px solid rgba(121, 40, 202, 0.6)' : '1px solid transparent',
-                background: activeTab === 'remaster' ? 'linear-gradient(135deg, rgba(121, 40, 202, 0.25), rgba(255, 0, 128, 0.25))' : 'transparent',
-                color: activeTab === 'remaster' ? '#fff' : '#8892b0',
-                fontWeight: 800,
-                fontSize: '13px',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
-            >
-              <span>🪄</span> Remaster & Edit Photo with AI
-            </button>
-          </div>
-        </div>
+        <div className="zq-ai-studio-workspace">
+          <section className="zq-ai-studio-controls" aria-label={activeTab === 'generate' ? 'Image generation controls' : 'Photo editing controls'}>
+            {activeTab === 'generate' ? (
+              <>
+                <label className="zq-ai-label" htmlFor="zq-ai-prompt">Describe the image</label>
+                <textarea id="zq-ai-prompt" className="zq-ai-prompt" maxLength={700} value={prompt} onChange={(event) => setPrompt(event.target.value)} placeholder="A cinematic portrait of a creative musician in a sunlit recording studio…" />
+                <div className="zq-ai-character-count">{prompt.length}/700</div>
 
-        {/* Tab Content Area */}
-        <div className="zq-ai-studio-content" style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
-          {/* TAB 1: TEXT TO IMAGE GENERATION */}
-          {activeTab === 'generate' && (
-            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-              {/* Left Form Controls */}
-              <div style={{ flex: '1 1 380px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {/* Gender / Subject Persona Selector */}
-                <div>
-                  <label style={{ fontSize: '11px', fontWeight: 800, color: '#00dfd8', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>
-                    1. Subject Persona & Gender
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-                    {genderOptions.map((g) => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => setGender(g.id as any)}
-                        style={{
-                          padding: '8px 12px',
-                          borderRadius: '10px',
-                          border: gender === g.id ? '1px solid #00dfd8' : '1px solid rgba(255, 255, 255, 0.08)',
-                          background: gender === g.id ? 'rgba(0, 223, 216, 0.15)' : 'rgba(255, 255, 255, 0.03)',
-                          color: gender === g.id ? '#00dfd8' : '#ccd6f6',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        <div>{g.label}</div>
-                        <div style={{ fontSize: '10px', fontWeight: 400, opacity: 0.7 }}>{g.desc}</div>
-                      </button>
+                <div className="zq-ai-suggestions">
+                  <span className="zq-ai-section-label">Try an idea</span>
+                  <div className="zq-ai-suggestion-list">
+                    {suggestions.map((suggestion) => (
+                      <button key={suggestion} type="button" onClick={() => setPrompt(suggestion)}>{suggestion}</button>
                     ))}
                   </div>
                 </div>
 
-                {/* Prompt Textarea */}
-                <div>
-                  <label style={{ fontSize: '11px', fontWeight: 800, color: '#7928ca', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '6px', display: 'block' }}>
-                    2. Describe Your Desired Look & Tech Vibe
-                  </label>
-                  <textarea
-                    placeholder="e.g. Software engineer in high-tech obsidian lab with subtle cyan aura lighting, glasses, 8k portrait..."
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    style={{
-                      width: '100%',
-                      minHeight: '74px',
-                      padding: '10px 12px',
-                      borderRadius: '12px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
-                      color: '#fff',
-                      fontSize: '13px',
-                      lineHeight: 1.4,
-                      outline: 'none',
-                      resize: 'vertical',
-                      boxSizing: 'border-box',
-                    }}
-                  />
+                <div className="zq-ai-option-row">
+                  <label className="zq-ai-label" htmlFor="zq-ai-persona">Portrait presentation</label>
+                  <select id="zq-ai-persona" value={persona} onChange={(event) => setPersona(event.target.value as Persona)}>
+                    <option value="neutral">Neutral</option>
+                    <option value="female">Feminine</option>
+                    <option value="male">Masculine</option>
+                    <option value="cyborg">Futuristic</option>
+                  </select>
                 </div>
-
-                {/* Prompt Inspirations */}
                 <div>
-                  <span style={{ fontSize: '11px', color: '#8892b0', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                    ⚡ Instant Inspirations:
-                  </span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                    {promptSuggestions.map((s, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setPrompt(s)}
-                        style={{
-                          padding: '4px 8px',
-                          borderRadius: '8px',
-                          background: 'rgba(255, 255, 255, 0.04)',
-                          border: '1px solid rgba(255, 255, 255, 0.08)',
-                          color: '#ccd6f6',
-                          fontSize: '11px',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                        }}
-                      >
-                        {s.substring(0, 32)}...
+                  <span className="zq-ai-section-label">Visual direction</span>
+                  <div className="zq-ai-style-grid">
+                    {styles.map((item) => (
+                      <button key={item.id} type="button" className={style === item.id ? 'selected' : ''} onClick={() => setStyle(item.id)} aria-pressed={style === item.id}>
+                        <strong>{item.label}</strong><span>{item.detail}</span>
                       </button>
                     ))}
                   </div>
                 </div>
-
-                {/* Style Selector */}
-                <div>
-                  <label style={{ fontSize: '11px', fontWeight: 800, color: '#ff0080', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '6px', display: 'block' }}>
-                    3. Select Neural Art Style
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-                    {styleOptions.map((st) => (
-                      <button
-                        key={st.id}
-                        type="button"
-                        onClick={() => setStyle(st.id)}
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: '10px',
-                          border: style === st.id ? '1px solid #00dfd8' : '1px solid rgba(255, 255, 255, 0.08)',
-                          background: style === st.id ? 'rgba(0, 223, 216, 0.15)' : 'rgba(255, 255, 255, 0.03)',
-                          color: style === st.id ? '#00dfd8' : '#ccd6f6',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        <span style={{ fontSize: '15px' }}>{st.icon}</span>
-                        <div>
-                          <div>{st.name}</div>
-                          <div style={{ fontSize: '9.5px', fontWeight: 400, opacity: 0.7 }}>{st.desc}</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {genError && (
-                  <div style={{ color: '#ff3366', fontSize: '12px', background: 'rgba(255,51,102,0.1)', padding: '8px 12px', borderRadius: '8px' }}>
-                    {genError}
-                  </div>
-                )}
-
-                {/* Generate Button */}
-                <button
-                  type="button"
-                  disabled={isGenerating}
-                  onClick={handleGenerate}
-                  style={{
-                    padding: '13px',
-                    borderRadius: '14px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #00dfd8 0%, #7928ca 100%)',
-                    color: '#fff',
-                    fontWeight: 800,
-                    fontSize: '14px',
-                    letterSpacing: '0.4px',
-                    cursor: isGenerating ? 'wait' : 'pointer',
-                    boxShadow: '0 4px 20px rgba(0, 223, 216, 0.4)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  {isGenerating ? (
-                    <>
-                      <span className="zq-pulse-orb" /> Synthesizing Neural Image...
-                    </>
-                  ) : (
-                    <>
-                      <span>⚡</span> Generate Realistic Avatar
-                    </>
-                  )}
+                <button type="button" className="zq-ai-primary-button" onClick={generate} disabled={active}>
+                  {isGenerating ? <><span className="zq-ai-spinner" /> Creating image…</> : 'Create image'}
                 </button>
-              </div>
-
-              {/* Right Preview Card */}
-              <div
-                style={{
-                  flex: '1 1 280px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(0, 0, 0, 0.4)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '20px',
-                  padding: '24px',
-                  minHeight: '340px',
-                  textAlign: 'center',
-                }}
-              >
-                {isGenerating ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-                    <div
-                      style={{
-                        width: '72px',
-                        height: '72px',
-                        borderRadius: '50%',
-                        border: '3px solid transparent',
-                        borderTopColor: '#00dfd8',
-                        borderRightColor: '#7928ca',
-                        animation: 'spin 1s linear infinite',
-                      }}
-                    />
-                    <div style={{ color: '#00dfd8', fontWeight: 700, fontSize: '14px' }}>
-                      Quantum Rendering Active...
-                    </div>
-                    <p style={{ color: '#8892b0', fontSize: '12px', maxWidth: '200px', margin: 0 }}>
-                      Rendering high-fidelity textures, raytracing volumetric lighting, and 8k details
-                    </p>
-                  </div>
-                ) : generatedUrl ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                    <div
-                      style={{
-                        width: '210px',
-                        height: '210px',
-                        borderRadius: '50%',
-                        overflow: 'hidden',
-                        border: '4px solid #00dfd8',
-                        boxShadow: '0 0 32px rgba(0, 223, 216, 0.4)',
-                        marginBottom: '16px',
-                      }}
-                    >
-                      <img
-                        src={generatedUrl}
-                        alt="AI Result"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    </div>
-                    <span style={{ fontSize: '12px', color: '#00dfd8', fontWeight: 700, marginBottom: '14px' }}>
-                      ✦ NEURAL SYNTHESIS COMPLETE
-                    </span>
-                    <button
-                      onClick={() => onApplyAvatar(generatedUrl)}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        borderRadius: '14px',
-                        border: 'none',
-                        background: 'linear-gradient(135deg, #10b981 0%, #00dfd8 100%)',
-                        color: '#fff',
-                        fontWeight: 800,
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
-                      }}
-                    >
-                      Lock In as My Profile Avatar ✓
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ color: '#8892b0' }}>
-                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎨</div>
-                    <h4 style={{ color: '#fff', fontSize: '16px', fontWeight: 800, margin: '0 0 4px 0' }}>
-                      Neural Canvas Ready
-                    </h4>
-                    <p style={{ fontSize: '12px', maxWidth: '220px', margin: 0 }}>
-                      Select a gender persona and art style, then click Generate to create a custom realistic avatar.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: REMASTER & MODIFY EXISTING PHOTO */}
-          {activeTab === 'remaster' && (
-            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-              {/* Left Column: Image Source & Prompts */}
-              <div style={{ flex: '1 1 380px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <label style={{ fontSize: '11px', fontWeight: 800, color: '#7928ca', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-                      1. Photo to Remaster
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: '8px',
-                        background: 'rgba(255, 255, 255, 0.08)',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
-                        color: '#ccd6f6',
-                        fontSize: '11px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      📁 Upload Different Photo
-                    </button>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      style={{ display: 'none' }}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handlePickCustomPhoto(f);
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', background: 'rgba(255, 255, 255, 0.03)', padding: '10px 14px', borderRadius: '14px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                    <img
-                      src={sourceImageUrl}
-                      alt="Source"
-                      style={{ width: '50px', height: '50px', borderRadius: '12px', objectFit: 'cover', border: '2px solid rgba(255, 255, 255, 0.2)' }}
-                    />
-                    <div>
-                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>Selected Subject Photo</div>
-                      <div style={{ fontSize: '11px', color: '#9499ab' }}>AI will analyze facial geometry & style parameters</div>
-                    </div>
-                  </div>
-                  <p style={{ margin: '8px 2px 0', fontSize: '11px', lineHeight: 1.5, color: '#b8c3d8' }}>
-                    Remastering sends this photo to Pollinations AI for processing. Only use images you have permission to share.
-                  </p>
+              </>
+            ) : (
+              <>
+                <div className="zq-ai-source-heading">
+                  <div><span className="zq-ai-label">Photo to edit</span><p>Upload a clear portrait for best results.</p></div>
+                  <button type="button" className="zq-ai-secondary-button" onClick={() => fileInputRef.current?.click()} disabled={active}>Upload photo</button>
+                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadSource(file); event.currentTarget.value = ''; }} />
                 </div>
-
-                {/* Target Gender / Persona for Remaster */}
-                <div>
-                  <label style={{ fontSize: '11px', fontWeight: 800, color: '#00dfd8', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '6px', display: 'block' }}>
-                    2. Subject Gender / Identity
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-                    {genderOptions.map((g) => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => setModifyGender(g.id as any)}
-                        style={{
-                          padding: '8px 10px',
-                          borderRadius: '10px',
-                          border: modifyGender === g.id ? '1px solid #7928ca' : '1px solid rgba(255, 255, 255, 0.08)',
-                          background: modifyGender === g.id ? 'rgba(121, 40, 202, 0.2)' : 'rgba(255, 255, 255, 0.03)',
-                          color: modifyGender === g.id ? '#c4b5fd' : '#ccd6f6',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                        }}
-                      >
-                        {g.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ fontSize: '11px', fontWeight: 800, color: '#ff0080', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: '6px', display: 'block' }}>
-                    3. Natural Language AI Modifications
-                  </label>
-                  <textarea
-                    placeholder="e.g. Add subtle purple & cyan neon ambient lighting, make background a futuristic obsidian glass office, sharp 8k details..."
-                    value={modifyPrompt}
-                    onChange={(e) => setModifyPrompt(e.target.value)}
-                    style={{
-                      width: '100%',
-                      minHeight: '74px',
-                      padding: '10px 12px',
-                      borderRadius: '12px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
-                      color: '#fff',
-                      fontSize: '13px',
-                      lineHeight: 1.4,
-                      outline: 'none',
-                      resize: 'vertical',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-
-                {/* Quick Transformation Presets */}
-                <div>
-                  <span style={{ fontSize: '11px', color: '#8892b0', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                    🪄 1-Click AI Presets:
-                  </span>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '5px' }}>
-                    {[
-                      { name: '✨ Studio Lighting & Retouch', p: 'Studio softbox rim lighting, natural skin texture, 8k details', s: 'studio' },
-                      { name: '⚡ Cyberpunk Persona', p: 'Glowing cyan & magenta neon ambient light with obsidian tech lab', s: 'cyberpunk' },
-                      { name: '🎨 3D Anime Metamorphosis', p: '3D anime digital art avatar, Makoto Shinkai style, vibrant shading', s: 'anime' },
-                      { name: '🪐 Cosmic Stardust Aura', p: 'Glowing celestial nebula stardust particles around the subject', s: 'cosmic' },
-                    ].map((pr, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => {
-                          setModifyPrompt(pr.p);
-                          setModifyStyle(pr.s);
-                        }}
-                        style={{
-                          padding: '7px 9px',
-                          borderRadius: '8px',
-                          background: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid rgba(255, 255, 255, 0.08)',
-                          color: '#ccd6f6',
-                          fontSize: '10.5px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                        }}
-                      >
-                        {pr.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {remasterError && (
-                  <div style={{ color: '#ff3366', fontSize: '12px', background: 'rgba(255,51,102,0.1)', padding: '8px 12px', borderRadius: '8px' }}>
-                    {remasterError}
-                  </div>
-                )}
-
-                {/* Remaster Action Button */}
-                <button
-                  type="button"
-                  disabled={isRemastering}
-                  onClick={handleRemaster}
-                  style={{
-                    padding: '13px',
-                    borderRadius: '14px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #7928ca 0%, #ff0080 100%)',
-                    color: '#fff',
-                    fontWeight: 800,
-                    fontSize: '14px',
-                    letterSpacing: '0.4px',
-                    cursor: isRemastering ? 'wait' : 'pointer',
-                    boxShadow: '0 4px 20px rgba(121, 40, 202, 0.4)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '10px',
-                  }}
-                >
-                  {isRemastering ? (
-                    <>
-                      <span className="zq-pulse-orb" /> Remastering with AI...
-                    </>
+                <div className="zq-ai-source-preview">
+                  {hasUsableSource ? (
+                    <img src={sourceImageUrl} alt="Photo selected for editing" onError={() => setSourceHasError(true)} />
                   ) : (
-                    <>
-                      <span>🪄</span> Remaster Image with AI
-                    </>
+                    <div><span aria-hidden="true">＋</span><strong>{sourceHasError ? 'Photo unavailable' : 'Add a photo to begin'}</strong><small>Upload a JPG, PNG, WebP, or GIF image.</small></div>
                   )}
+                </div>
+                <label className="zq-ai-label" htmlFor="zq-ai-modify-prompt">What would you like to change?</label>
+                <textarea id="zq-ai-modify-prompt" className="zq-ai-prompt" maxLength={500} value={modifyPrompt} onChange={(event) => setModifyPrompt(event.target.value)} placeholder="Improve the lighting, soften the background, keep my face natural…" />
+                <div className="zq-ai-character-count">{modifyPrompt.length}/500</div>
+                <div className="zq-ai-suggestions">
+                  <span className="zq-ai-section-label">Quick edits</span>
+                  <div className="zq-ai-suggestion-list">
+                    {remasterPresets.map((preset) => (
+                      <button key={preset.label} type="button" onClick={() => { setModifyPrompt(preset.prompt); setModifyStyle(preset.style); }}>{preset.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="zq-ai-option-row">
+                  <label className="zq-ai-label" htmlFor="zq-ai-edit-style">Visual direction</label>
+                  <select id="zq-ai-edit-style" value={modifyStyle} onChange={(event) => setModifyStyle(event.target.value)}>{styles.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>
+                </div>
+                <button type="button" className="zq-ai-primary-button zq-ai-edit-button" onClick={() => void remaster()} disabled={active || !hasUsableSource}>
+                  {isUploading ? <><span className="zq-ai-spinner" /> Uploading photo…</> : isRemastering ? <><span className="zq-ai-spinner" /> Editing photo…</> : 'Remaster photo'}
                 </button>
-              </div>
+              </>
+            )}
 
-              {/* Right Column: Comparison & Result */}
-              <div
-                style={{
-                  flex: '1 1 280px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(0, 0, 0, 0.4)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '20px',
-                  padding: '24px',
-                  minHeight: '340px',
-                  textAlign: 'center',
-                }}
-              >
-                {isRemastering ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-                    <div
-                      style={{
-                        width: '72px',
-                        height: '72px',
-                        borderRadius: '50%',
-                        border: '3px solid transparent',
-                        borderTopColor: '#7928ca',
-                        borderRightColor: '#ff0080',
-                        animation: 'spin 1s linear infinite',
-                      }}
-                    />
-                    <div style={{ color: '#ff0080', fontWeight: 700, fontSize: '14px' }}>
-                      AI Remastering In Progress...
-                    </div>
-                    <p style={{ color: '#8892b0', fontSize: '12px', maxWidth: '220px', margin: 0 }}>
-                      Synthesizing neural modifications, atmospheric aura, and enhanced textures
-                    </p>
-                  </div>
-                ) : remasteredUrl ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-                    <div
-                      style={{
-                        width: '210px',
-                        height: '210px',
-                        borderRadius: '50%',
-                        overflow: 'hidden',
-                        border: '4px solid #ff0080',
-                        boxShadow: '0 0 32px rgba(255, 0, 128, 0.4)',
-                        marginBottom: '16px',
-                      }}
-                    >
-                      <img
-                        src={remasteredUrl}
-                        alt="Remastered Result"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      />
-                    </div>
-                    <span style={{ fontSize: '12px', color: '#ff0080', fontWeight: 700, marginBottom: '14px' }}>
-                      ✦ AI REMASTERED OUTPUT
-                    </span>
-                    <button
-                      onClick={() => onApplyAvatar(remasteredUrl)}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        borderRadius: '14px',
-                        border: 'none',
-                        background: 'linear-gradient(135deg, #7928ca 0%, #ff0080 100%)',
-                        color: '#fff',
-                        fontWeight: 800,
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 16px rgba(255, 0, 128, 0.4)',
-                      }}
-                    >
-                      Lock In as My Profile Avatar ✓
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ color: '#8892b0' }}>
-                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>🪄</div>
-                    <h4 style={{ color: '#fff', fontSize: '16px', fontWeight: 800, margin: '0 0 4px 0' }}>
-                      Remaster Studio Ready
-                    </h4>
-                    <p style={{ fontSize: '12px', maxWidth: '220px', margin: 0 }}>
-                      Type what you want to add or change (or click a 1-click preset) and click Remaster.
-                    </p>
-                  </div>
-                )}
-              </div>
+            {notice && <p className="zq-ai-notice" role="status">{notice}</p>}
+            {error && <p className="zq-ai-error" role="alert">{error}</p>}
+          </section>
+
+          <aside className="zq-ai-result-panel" aria-label="Image result preview">
+            <div className="zq-ai-result-heading"><span>PREVIEW</span><span>{resultUrl ? 'READY' : active ? 'WORKING' : 'YOUR CANVAS'}</span></div>
+            <div className="zq-ai-canvas">
+              {active ? (
+                <div className="zq-ai-working" role="status"><span className="zq-ai-large-spinner" /><strong>{isUploading ? 'Uploading your photo' : isRemastering ? 'Editing your photo' : 'Creating your image'}</strong><p>This can take up to a minute. Keep this window open.</p></div>
+              ) : resultUrl ? (
+                <img className="zq-ai-result-image" src={resultUrl} alt="AI image result" onError={() => { setError('The generated image could not be loaded. Please create it again.'); activeTab === 'generate' ? setGeneratedUrl(null) : setRemasteredUrl(null); }} />
+              ) : (
+                <div className="zq-ai-empty-canvas"><span aria-hidden="true">✳</span><strong>Your image will appear here</strong><p>{activeTab === 'generate' ? 'Describe a look, choose a style, and create.' : 'Upload a portrait, describe your edit, and remaster.'}</p></div>
+              )}
             </div>
-          )}
+            {resultUrl ? (
+              <div className="zq-ai-result-actions">
+                <button type="button" className="zq-ai-primary-button" onClick={() => void applyResult()}>Use as profile photo</button>
+                <a className="zq-ai-download-link" href={resultUrl} download target="_blank" rel="noreferrer">Open or download image</a>
+              </div>
+            ) : (
+              <p className="zq-ai-provider-note">Images are generated by the configured AI image provider. Results can vary by prompt and availability.</p>
+            )}
+          </aside>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

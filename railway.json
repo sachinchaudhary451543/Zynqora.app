@@ -5,7 +5,6 @@
     "dockerfilePath": "backend/Dockerfile"
   },
   "deploy": {
-    "preDeployCommand": "npx prisma db push",
     "startCommand": "node start.js",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 300,

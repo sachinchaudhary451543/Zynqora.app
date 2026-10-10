@@ -26,7 +26,29 @@ export class UploadsService {
   }
 
   usingS3(): boolean {
-    return !!process.env.AWS_S3_BUCKET;
+    const bucket = process.env.AWS_S3_BUCKET?.trim();
+    const endpoint = process.env.S3_ENDPOINT?.trim();
+    const publicBaseUrl = process.env.S3_PUBLIC_BASE_URL?.trim();
+
+    if (endpoint && !bucket) {
+      throw new ServiceUnavailableException('AWS_S3_BUCKET is required when S3_ENDPOINT is configured.');
+    }
+    if (endpoint && !publicBaseUrl) {
+      throw new ServiceUnavailableException('S3_PUBLIC_BASE_URL is required when S3_ENDPOINT is configured.');
+    }
+    if (endpoint) {
+      let endpointProtocol: string;
+      try {
+        endpointProtocol = new URL(endpoint).protocol;
+      } catch {
+        throw new ServiceUnavailableException('S3_ENDPOINT must be a valid HTTPS URL.');
+      }
+      if (endpointProtocol !== 'https:') {
+        throw new ServiceUnavailableException('S3_ENDPOINT must use HTTPS.');
+      }
+    }
+
+    return Boolean(bucket);
   }
 
   getUploadsDir() {
@@ -39,18 +61,17 @@ export class UploadsService {
 
     if (this.usingS3()) {
       try {
-        // dynamic import to avoid hard dependency when not configured
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
         const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-        const client = new S3Client({ region: process.env.AWS_REGION });
-        const bucket = process.env.AWS_S3_BUCKET;
+        const client = this.createS3Client();
+        const bucket = this.requireS3Bucket();
         const cmd = new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType });
         const uploadUrl = await getSignedUrl(client, cmd, { expiresIn: 3600 });
-        const publicUrl = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+        const publicUrl = this.s3PublicUrl(bucket, key);
         return { uploadUrl, key, publicUrl, method: 'PUT' };
       } catch (e) {
-        logger.warn('S3 presign failed, falling back to local: ' + e.message);
+        logger.error(`S3 presign failed: ${e instanceof Error ? e.message : 'unknown error'}`);
+        throw new ServiceUnavailableException('Media storage is unavailable. Please try again.');
       }
     }
 
@@ -113,19 +134,18 @@ export class UploadsService {
       // If S3 configured, upload processed file back to S3 and return public URL
       if (this.usingS3()) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-          const client = new S3Client({ region: process.env.AWS_REGION });
-          const bucket = process.env.AWS_S3_BUCKET;
+          const client = this.createS3Client();
+          const bucket = this.requireS3Bucket();
           const outBuffer = require('fs').readFileSync(tmpOut);
           const outKey = `processed/${outputKey}`;
           const cmd = new PutObjectCommand({ Bucket: bucket, Key: outKey, Body: outBuffer, ContentType: 'video/mp4' });
           await client.send(cmd);
-          const publicUrl = `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${outKey}`;
+          const publicUrl = this.s3PublicUrl(bucket, outKey);
           return { processedPath: tmpOut, publicUrl, key: outKey };
         } catch (e) {
-          logger.warn('upload processed to S3 failed: ' + e.message);
-          return { processedPath: tmpOut };
+          logger.error(`S3 processed-media upload failed: ${e instanceof Error ? e.message : 'unknown error'}`);
+          throw new ServiceUnavailableException('Media storage is unavailable. Please try again.');
         }
       }
 
@@ -200,7 +220,7 @@ export class UploadsService {
     // Build enhanced prompt
     const finalPromptText = `${stylePrefix}${genderPrefix}${userPrompt}${styleSuffix}`;
     const fullPrompt = encodeURIComponent(finalPromptText);
-    const aiEngineUrl = `https://image.pollinations.ai/prompt/${fullPrompt}?width=768&height=768&seed=${rawSeed}&nologo=true`;
+    const aiEngineUrl = `https://image.pollinations.ai/prompt/${fullPrompt}?width=768&height=768&seed=${rawSeed}&nologo=true&private=true`;
 
     logger.log(`Generating AI image: seed=${rawSeed}`);
 
@@ -216,7 +236,7 @@ export class UploadsService {
         const generatedContentType = (res.headers.get('content-type') || 'image/jpeg').split(';')[0].toLowerCase();
         if (!generatedContentType.startsWith('image/')) throw new Error('AI engine returned a non-image response');
         assertAllowedUploadMime(generatedContentType);
-        const buffer = Buffer.from(await res.arrayBuffer());
+        const buffer = await this.readImageResponse(res);
         if (buffer.length <= 500 || buffer.length > MAX_UPLOAD_BYTES) {
           throw new Error('AI engine returned an invalid image size');
         }
@@ -281,7 +301,7 @@ export class UploadsService {
         if (!response.ok) throw new Error(`AI engine returned status ${response.status}`);
         const outputType = (response.headers.get('content-type') || '').split(';')[0].toLowerCase();
         if (!outputType.startsWith('image/')) throw new Error('AI engine returned a non-image response');
-        const output = Buffer.from(await response.arrayBuffer());
+        const output = await this.readImageResponse(response);
         if (output.length <= 500 || output.length > MAX_UPLOAD_BYTES) throw new Error('AI engine returned an invalid image size');
         const saved = await this.saveImageBuffer(output, outputType);
         return { ...saved, prompt, style: options.style, gender: options.gender };
@@ -300,6 +320,29 @@ export class UploadsService {
 
   private async fetchRemoteBuffer(url: string) {
     return (await this.fetchRemoteBufferWithType(url)).buffer;
+  }
+
+  private async readImageResponse(response: Response) {
+    const chunks: Buffer[] = [];
+    let totalBytes = 0;
+    if (!response.body) throw new Error('AI engine returned an empty response');
+    const reader = response.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const bytes = Buffer.from(value);
+        totalBytes += bytes.length;
+        if (totalBytes > MAX_UPLOAD_BYTES) {
+          await reader.cancel();
+          throw new Error('AI engine returned an image that exceeds the upload size limit');
+        }
+        chunks.push(bytes);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    return Buffer.concat(chunks, totalBytes);
   }
 
   private async fetchRemoteBufferWithType(url: string) {
@@ -377,8 +420,8 @@ export class UploadsService {
 
     if (this.usingS3()) {
       const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-      const client = new S3Client({ region: process.env.AWS_REGION });
-      const bucket = process.env.AWS_S3_BUCKET;
+      const client = this.createS3Client();
+      const bucket = this.requireS3Bucket();
       await client.send(new PutObjectCommand({
         Bucket: bucket,
         Key: key,
@@ -387,7 +430,7 @@ export class UploadsService {
       }));
       return {
         key,
-        publicUrl: `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`,
+        publicUrl: this.s3PublicUrl(bucket, key),
       };
     }
 
@@ -398,5 +441,29 @@ export class UploadsService {
   private publicUrlForKey(key: string) {
     const serverBase = process.env.SERVER_BASE_URL ?? 'http://localhost:3000';
     return `${serverBase}/uploads/${key}`;
+  }
+
+  private createS3Client() {
+    const { S3Client } = require('@aws-sdk/client-s3');
+    const endpoint = process.env.S3_ENDPOINT?.trim();
+    return new S3Client({
+      region: process.env.AWS_REGION?.trim() || 'us-east-1',
+      ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
+    });
+  }
+
+  private s3PublicUrl(bucket: string, key: string) {
+    const publicBaseUrl = process.env.S3_PUBLIC_BASE_URL?.trim();
+    if (publicBaseUrl) {
+      const encodedKey = key.split('/').map((part) => encodeURIComponent(part)).join('/');
+      return `${publicBaseUrl.replace(/\/+$/, '')}/${encodedKey}`;
+    }
+    return `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+  }
+
+  private requireS3Bucket() {
+    const bucket = process.env.AWS_S3_BUCKET?.trim();
+    if (!bucket) throw new ServiceUnavailableException('AWS_S3_BUCKET is required for S3-compatible storage.');
+    return bucket;
   }
 }

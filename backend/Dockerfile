@@ -5,10 +5,10 @@ WORKDIR /app
 
 RUN apk add --no-cache openssl
 
-COPY package*.json ./
+COPY backend/package*.json ./
 RUN npm ci --include=dev
 
-COPY . .
+COPY backend/ ./
 RUN npx prisma generate
 RUN npm run build && test -f dist/main.js
 
