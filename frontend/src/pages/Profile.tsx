@@ -200,12 +200,16 @@ export default function Profile() {
   const uploadSelectedProfileImage = async () => await uploadFileIfAny();
 
   const uploadBanner = async (file: File) => {
+    setError('');
     setUploading(true);
     try {
       const result = await api.uploadMedia(file);
       const updated = await api.updateProfile({ bannerImage: result.publicUrl });
-      setProfile((current: any) => ({ ...current, bannerImage: updated.bannerImage }));
-      setUserState?.(updated as any);
+      const bannerImage = updated.bannerImage
+        ? `${updated.bannerImage}${updated.bannerImage.includes('?') ? '&' : '?'}v=${Date.now()}`
+        : updated.bannerImage;
+      setProfile((current: any) => ({ ...current, bannerImage }));
+      setUserState?.({ ...updated, bannerImage } as any);
     } catch (err: any) {
       setError(err.message || 'Failed to update banner image');
     } finally {
@@ -379,8 +383,10 @@ export default function Profile() {
           }}
         >
           {/* Avatar with Aura Ring */}
-          <div 
+          <button
+            type="button"
             style={{ 
+              appearance: 'none',
               position: 'relative',
               cursor: isOwnProfile ? 'pointer' : 'default',
               padding: 5,
@@ -388,7 +394,12 @@ export default function Profile() {
               background: `linear-gradient(45deg, ${auraColor}, #00f2fe)`,
               boxShadow: `0 0 20px ${auraColor}66`,
               flexShrink: 0,
+              border: 0,
             }}
+            aria-label="Change profile photo"
+            aria-haspopup="dialog"
+            aria-expanded={showAvatarModal}
+            disabled={!isOwnProfile}
             onClick={() => isOwnProfile && setShowAvatarModal(true)}
           >
             <img 
@@ -407,7 +418,7 @@ export default function Profile() {
                 <ImageIcon size={14} />
               </div>
             )}
-          </div>
+          </button>
           
           <div style={{ paddingBottom: 10 }}>
             <h1 style={{ margin: 0, fontSize: 24, display: 'flex', alignItems: 'center', gap: 6, color: '#fff' }}>
@@ -872,6 +883,8 @@ export default function Profile() {
       
       {showAvatarModal && (
         <AvatarActionsModal
+          currentAvatarUrl={avatarUrlToDisplay}
+          currentAvatarName={profile.name || profile.username}
           onClose={() => setShowAvatarModal(false)}
           onPickFile={handlePickFile}
           onEdit={() => { setShowEditor(true); setShowAvatarModal(false); }}

@@ -1,7 +1,10 @@
-import React, { useRef } from 'react';
-import { AuraSparkIcon } from './Icons';
+import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { getDefaultAvatar } from '../api/client';
 
 interface AvatarActionsModalProps {
+  currentAvatarUrl: string;
+  currentAvatarName: string;
   onClose: () => void;
   onPickFile: (file: File) => void;
   onEdit: () => void;
@@ -10,7 +13,24 @@ interface AvatarActionsModalProps {
   onRemove: () => void;
 }
 
+function PhotoActionIcon({ type }: { type: 'upload' | 'studio' | 'edit' | 'remove' }) {
+  const paths = {
+    upload: <><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M20 16.5v2A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5v-2" /></>,
+    studio: <><path d="m12 3 1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6L12 3Z" /><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z" /></>,
+    edit: <><path d="m14 5 5 5" /><path d="m4 20 4.2-.8L19 8.4a2.1 2.1 0 0 0-3-3L5.2 16.2 4 20Z" /><path d="M12 20h8" /></>,
+    remove: <><path d="M4 7h16" /><path d="m6 7 .8 13h10.4L18 7" /><path d="M9 7V4h6v3" /><path d="M10 11v5M14 11v5" /></>,
+  };
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      {paths[type]}
+    </svg>
+  );
+}
+
 export default function AvatarActionsModal({
+  currentAvatarUrl,
+  currentAvatarName,
   onClose,
   onPickFile,
   onEdit,
@@ -19,223 +39,151 @@ export default function AvatarActionsModal({
   onRemove,
 }: AvatarActionsModalProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const auraColor = '#7928ca';
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
 
-  return (
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+      if (event.key !== 'Tab') return;
+
+      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled])');
+      if (!focusable?.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [onClose]);
+
+  return createPortal(
     <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999,
-        background: 'rgba(4, 6, 12, 0.82)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '20px',
+      className="zq-avatar-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'linear-gradient(180deg, #131728 0%, #0c0e18 100%)',
-          border: '1px solid rgba(121, 40, 202, 0.35)',
-          borderRadius: '24px',
-          width: '100%',
-          maxWidth: '380px',
-          overflow: 'hidden',
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.8), 0 0 40px rgba(121, 40, 202, 0.2)',
-          textAlign: 'center',
-          animation: 'zqZoomIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-        }}
+        ref={dialogRef}
+        className="zq-avatar-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="zq-avatar-dialog-title"
+        aria-describedby="zq-avatar-dialog-description"
+        tabIndex={-1}
       >
-        {/* Header */}
-        <div style={{ padding: '24px 20px 16px 20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
-          <div
-            style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, rgba(0, 223, 216, 0.2), rgba(121, 40, 202, 0.2))',
-              border: '1px solid rgba(0, 223, 216, 0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 12px auto',
-              color: '#00dfd8',
+        <header className="zq-avatar-dialog-header">
+          <img
+            className="zq-avatar-dialog-preview"
+            src={currentAvatarUrl}
+            alt="Current profile photo"
+            onError={(event) => {
+              event.currentTarget.onerror = null;
+              event.currentTarget.src = getDefaultAvatar(currentAvatarName);
             }}
-          >
-            <AuraSparkIcon size={24} active={true} />
+          />
+          <div className="zq-avatar-dialog-heading">
+            <span className="zq-avatar-dialog-eyebrow">YOUR PROFILE</span>
+            <h2 id="zq-avatar-dialog-title">Update profile photo</h2>
+            <p id="zq-avatar-dialog-description">Choose a photo, refine it, or create a new look.</p>
           </div>
-          <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fff', letterSpacing: '0.4px', margin: 0 }}>
-            Aura Identity & Avatar
-          </h3>
-          <p style={{ fontSize: '12px', color: '#9499ab', marginTop: '4px' }}>
-            Customize your unique presence across the Zynqora circles
-          </p>
-        </div>
-
-        {/* Action Buttons List */}
-        <div style={{ display: 'flex', flexDirection: 'column', padding: '12px 16px', gap: '8px' }}>
-          {/* Upload File */}
           <button
-            onClick={() => inputRef.current?.click()}
-            style={{
-              padding: '14px 18px',
-              borderRadius: '14px',
-              border: '1px solid rgba(0, 223, 216, 0.25)',
-              background: 'linear-gradient(135deg, rgba(0, 223, 216, 0.12), rgba(121, 40, 202, 0.12))',
-              color: '#00dfd8',
-              fontWeight: 700,
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0, 223, 216, 0.22), rgba(121, 40, 202, 0.22))';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0, 223, 216, 0.12), rgba(121, 40, 202, 0.12))';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
+            ref={closeButtonRef}
+            type="button"
+            className="zq-avatar-dialog-close"
+            aria-label="Close profile photo options"
+            onClick={onClose}
           >
-            <span>📁</span> Upload Photo
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </header>
+
+        <div className="zq-avatar-dialog-actions">
+          <button type="button" className="zq-avatar-action" onClick={() => inputRef.current?.click()}>
+            <span className="zq-avatar-action-icon zq-avatar-action-icon-upload"><PhotoActionIcon type="upload" /></span>
+            <span className="zq-avatar-action-copy">
+              <strong>Upload a photo</strong>
+              <span>Choose an image from this device</span>
+            </span>
+            <span className="zq-avatar-action-arrow" aria-hidden="true">›</span>
           </button>
           <input
             ref={inputRef}
             type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) onPickFile(f);
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="zq-avatar-file-input"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) onPickFile(file);
+              event.currentTarget.value = '';
             }}
           />
 
-          {/* AI Creative Studio */}
           <button
+            type="button"
+            className="zq-avatar-action"
             onClick={() => {
               if (onOpenAiStudio) onOpenAiStudio();
               else onGenerateAi();
             }}
-            style={{
-              padding: '14px 18px',
-              borderRadius: '14px',
-              border: '1px solid rgba(255, 0, 128, 0.35)',
-              background: 'linear-gradient(135deg, rgba(121, 40, 202, 0.2), rgba(255, 0, 128, 0.2))',
-              color: '#ff0080',
-              fontWeight: 800,
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(255, 0, 128, 0.15)',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(121, 40, 202, 0.3), rgba(255, 0, 128, 0.3))';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(121, 40, 202, 0.2), rgba(255, 0, 128, 0.2))';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
           >
-            <span>✨</span> Open Zynqora AI Creative Studio
+            <span className="zq-avatar-action-icon zq-avatar-action-icon-studio"><PhotoActionIcon type="studio" /></span>
+            <span className="zq-avatar-action-copy">
+              <strong>Create with AI Studio</strong>
+              <span>Remaster your portrait with a visual style</span>
+            </span>
+            <span className="zq-avatar-action-arrow" aria-hidden="true">›</span>
           </button>
 
-          {/* Filter / Contrast Editor */}
-          <button
-            onClick={onEdit}
-            style={{
-              padding: '14px 18px',
-              borderRadius: '14px',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              background: 'rgba(255, 255, 255, 0.04)',
-              color: '#f3f4f8',
-              fontWeight: 600,
-              fontSize: '14px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <span>🎨</span> Edit Filters & Contrast
-          </button>
-
-          {/* Remove */}
-          <button
-            onClick={() => {
-              if (confirm('Remove current profile photo?')) onRemove();
-            }}
-            style={{
-              padding: '12px 18px',
-              borderRadius: '14px',
-              border: '1px solid rgba(255, 51, 102, 0.2)',
-              background: 'rgba(255, 51, 102, 0.08)',
-              color: '#ff3366',
-              fontWeight: 600,
-              fontSize: '13px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 51, 102, 0.16)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 51, 102, 0.08)';
-            }}
-          >
-            <span>🗑️</span> Remove Current Photo
-          </button>
-
-          {/* Cancel */}
-          <button
-            onClick={onClose}
-            style={{
-              padding: '12px 18px',
-              borderRadius: '14px',
-              border: 'none',
-              background: 'transparent',
-              color: '#9499ab',
-              fontWeight: 600,
-              fontSize: '14px',
-              cursor: 'pointer',
-              marginTop: '4px',
-              transition: 'color 0.2s ease',
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
-            onMouseOut={(e) => (e.currentTarget.style.color = '#9499ab')}
-          >
-            Cancel
+          <button type="button" className="zq-avatar-action" onClick={onEdit}>
+            <span className="zq-avatar-action-icon zq-avatar-action-icon-edit"><PhotoActionIcon type="edit" /></span>
+            <span className="zq-avatar-action-copy">
+              <strong>Edit photo</strong>
+              <span>Crop and tune your current image</span>
+            </span>
+            <span className="zq-avatar-action-arrow" aria-hidden="true">›</span>
           </button>
         </div>
+
+        <footer className="zq-avatar-dialog-footer">
+          <button
+            type="button"
+            className="zq-avatar-remove-button"
+            onClick={() => {
+              if (confirm('Remove your current profile photo?')) onRemove();
+            }}
+          >
+            <PhotoActionIcon type="remove" />
+            Remove photo
+          </button>
+          <span className="zq-avatar-dialog-note">Your photo is used across your Zynqora profile.</span>
+        </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
