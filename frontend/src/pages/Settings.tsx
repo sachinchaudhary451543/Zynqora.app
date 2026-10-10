@@ -556,6 +556,8 @@ export default function SettingsPage() {
 
       {showAvatarModal && (
         <AvatarActionsModal
+          currentAvatarUrl={currentAvatar}
+          currentAvatarName={user?.name || user?.username || 'You'}
           onClose={() => setShowAvatarModal(false)}
           onPickFile={handlePickAvatarFile}
           onEdit={() => {
