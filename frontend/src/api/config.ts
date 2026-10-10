@@ -3,7 +3,7 @@ const pageOrigin = typeof window === 'undefined' ? 'https://zynqora.netlify.app'
 export function resolveApiBase(configured: string | undefined, isDevelopment: boolean, origin: string) {
   const base = configured?.trim() || (isDevelopment
     ? 'http://localhost:3000/api'
-    : 'https://zynqora-api.onrender.com/api');
+    : 'https://zynqora-api-production.up.railway.app/api');
   return new URL(base, origin).toString().replace(/\/$/, '');
 }
 
