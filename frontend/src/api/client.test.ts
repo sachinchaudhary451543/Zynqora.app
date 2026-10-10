@@ -33,6 +33,11 @@ describe('api client helpers', () => {
     expect(getAvatarUrl({
       name: 'Alex',
       username: 'alex',
+      avatarUrl: 'https://zynqora.netlify.app/uploads/old-photo.jpg',
+    })).toBe(getDefaultAvatar('Alex'));
+    expect(getAvatarUrl({
+      name: 'Alex',
+      username: 'alex',
       avatarUrl: 'https://cdn.example.com/uploads/photo.jpg',
     })).toBe('https://cdn.example.com/uploads/photo.jpg');
   });

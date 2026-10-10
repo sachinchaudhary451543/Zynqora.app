@@ -46,7 +46,7 @@ export function getAvatarUrl(user?: { username?: string | null; name?: string | 
   try {
     const hostname = new URL(resolved).hostname;
     if (new URL(resolved).pathname.startsWith('/uploads/') &&
-      (hostname.endsWith('.onrender.com') || hostname.endsWith('.up.railway.app'))) {
+      (hostname.endsWith('.onrender.com') || hostname.endsWith('.up.railway.app') || hostname.endsWith('.netlify.app'))) {
       return getDefaultAvatar(user.name || user.username);
     }
   } catch {
