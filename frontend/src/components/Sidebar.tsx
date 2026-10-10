@@ -52,9 +52,18 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
 
   useEffect(() => {
     const loadNotifications = () => api.getNotifications().then(setNotifications).catch(() => setNotifications([]));
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') loadNotifications();
+    };
     loadNotifications();
-    const interval = window.setInterval(loadNotifications, 15000);
-    return () => window.clearInterval(interval);
+    const interval = window.setInterval(() => {
+      refreshWhenVisible();
+    }, 60000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, []);
 
   const handleLogout = () => {
@@ -127,6 +136,15 @@ export default function Sidebar({ onOpenCreateModal, unreadCount = 4 }: SidebarP
         >
           <HomeIcon size={22} active={location.pathname === '/feed'} />
           <span>Feed</span>
+        </NavLink>
+
+        <NavLink
+          to="/circles"
+          className={({ isActive }) => `zq-mobile-nav-btn ${isActive ? 'active' : ''}`}
+          aria-label="Open Circles Hub"
+        >
+          <CirclesIcon size={22} active={location.pathname === '/circles'} />
+          <span>Circles</span>
         </NavLink>
 
         <NavLink

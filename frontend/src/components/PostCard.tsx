@@ -298,6 +298,7 @@ export default function PostCard({ post }: { post: Post }) {
               src={ytEmbedUrl}
               title="YouTube video player"
               frameBorder="0"
+              loading="lazy"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               style={{
@@ -312,10 +313,10 @@ export default function PostCard({ post }: { post: Post }) {
             /\.m3u8(?:[?#].*)?$/i.test(post.mediaUrl) ? (
               <HlsVideo src={resolveMediaUrl(post.mediaUrl)} onError={() => setMediaFailed(true)} />
             ) : (
-              <video src={resolveMediaUrl(post.mediaUrl)} playsInline muted={Boolean(post.musicUrl)} onError={() => setMediaFailed(true)} />
+              <video src={resolveMediaUrl(post.mediaUrl)} playsInline muted={Boolean(post.musicUrl)} preload="none" onError={() => setMediaFailed(true)} />
             )
           ) : (
-            <img src={resolveMediaUrl(post.mediaUrl)} alt="Sync media" onError={() => setMediaFailed(true)} />
+            <img src={resolveMediaUrl(post.mediaUrl)} alt="Sync media" loading="lazy" decoding="async" onError={() => setMediaFailed(true)} />
           )}
 
           {/* Holographic Spark Explosion */}
@@ -380,7 +381,7 @@ export default function PostCard({ post }: { post: Post }) {
         </div>
       )}
       {post.musicUrl && (
-        <audio ref={soundRef} className="zq-post-sound" preload="auto" src={resolveMediaUrl(post.musicUrl)} aria-label="Post sound" />
+        <audio ref={soundRef} className="zq-post-sound" preload="none" src={resolveMediaUrl(post.musicUrl)} aria-label="Post sound" />
       )}
 
       {/* Actions & Aura Reaction Bar */}

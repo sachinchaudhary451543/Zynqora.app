@@ -1,47 +1,60 @@
 import React, { useEffect, useState } from 'react';
-import { CommunityCircle, COMMUNITY_CIRCLES } from '../data/communityCircles';
+import { COMMUNITY_CIRCLES_CHANGED, CommunityCircle } from '../data/communityCircles';
 import { api } from '../api/client';
 
 export default function CommunityCirclesBar({
   selectedId = 'all',
   onSelect,
-  circles = COMMUNITY_CIRCLES,
 }: {
   selectedId?: string;
   onSelect?: (circle: CommunityCircle) => void;
-  circles?: CommunityCircle[];
 }) {
-  const [liveCircles, setLiveCircles] = useState<CommunityCircle[]>(circles);
+  const [liveCircles, setLiveCircles] = useState<CommunityCircle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
-    api.getCircles().then((records) => {
-      if (!active || !records.length) return;
-      setLiveCircles(records.map((circle) => ({
-        id: circle.slug,
-        name: `${circle.icon || ''}${circle.icon ? ' ' : ''}${circle.name}`,
-        // Show post count for named circles; total user count for Global Sync
-        count: circle.postCount !== null ? circle.postCount : circle.memberCount,
-        description: circle.description || '',
-        tone: 'var(--zq-aura-primary)',
-      })));
-    }).catch(() => {});
-    return () => { active = false; };
+    const load = () => {
+      api.getCircles()
+        .then((records) => {
+          if (!active) return;
+          setLiveCircles(records);
+          setError('');
+        })
+        .catch((err: unknown) => {
+          if (active) setError(err instanceof Error ? err.message : 'Could not load community circles.');
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+    load();
+    window.addEventListener(COMMUNITY_CIRCLES_CHANGED, load);
+    return () => {
+      active = false;
+      window.removeEventListener(COMMUNITY_CIRCLES_CHANGED, load);
+    };
   }, []);
 
   return (
     <nav className="zq-circles-bar" aria-label="Community circles">
       <div className="zq-circles-scroll-track">
+        {loading && <span className="zq-circle-status" role="status">Loading circles…</span>}
+        {!loading && error && <span className="zq-circle-status" role="alert">{error}</span>}
+        {!loading && !error && liveCircles.length === 0 && <span className="zq-circle-status">No circles are available yet.</span>}
         {liveCircles.map((circle) => (
           <button
             type="button"
-            key={circle.id}
-            className={`zq-circle-pill ${selectedId === circle.id ? 'active' : ''}`}
+            key={circle.slug}
+            className={`zq-circle-pill ${selectedId === circle.slug ? 'active' : ''}`}
             onClick={() => onSelect?.(circle)}
-            aria-pressed={selectedId === circle.id}
+            aria-pressed={selectedId === circle.slug}
           >
-            <span>{circle.name}</span>
-            {circle.count !== undefined && <span className="zq-circle-count">({circle.count.toLocaleString()})</span>}
+            <span>{circle.icon ? `${circle.icon} ` : ''}{circle.name}</span>
+            <span className="zq-circle-count">
+              {circle.memberCount.toLocaleString()} {circle.memberCount === 1 ? 'member' : 'members'}
+            </span>
           </button>
         ))}
       </div>

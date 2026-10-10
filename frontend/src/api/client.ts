@@ -3,8 +3,8 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? 'http:/
 
 function getApiOrigin() {
   try {
-      const apiOrigin = getApiOrigin();
-      throw new Error(`Cannot connect to the backend at ${apiOrigin}. Please try again or contact support if the service is unavailable.`);
+    const apiOrigin = getApiOrigin();
+    throw new Error(`Cannot connect to the backend at ${apiOrigin}. Please try again or contact support if the service is unavailable.`);
   } catch {
     return 'http://localhost:3000';
   }
@@ -72,6 +72,10 @@ export interface User {
   website?: string | null;
   category?: string | null;
   note?: string | null;
+  interests?: string[];
+  notifySocialActivity?: boolean;
+  notifyCircleActivity?: boolean;
+  weeklyDigestEnabled?: boolean;
   profileVisibility?: string;
   followersVisibility?: string;
   followingVisibility?: string;
@@ -107,6 +111,43 @@ export interface Post {
   isLiked?: boolean;
 }
 
+export interface CircleActivityIdea {
+  templateId: string;
+  kind: 'EVENT' | 'GAME' | 'TOURNAMENT' | 'ACTIVITY';
+  title: string;
+  description: string;
+  durationMinutes: number;
+  mode: 'ONLINE' | 'IN_PERSON' | 'HYBRID';
+  reason: string;
+}
+
+export interface CircleEventDraft {
+  kind?: CircleActivityIdea['kind'];
+  mode?: CircleActivityIdea['mode'];
+  gameMode?: 'EXTERNAL' | 'NATIVE_TRIVIA';
+  title: string;
+  description?: string;
+  startsAt: string;
+  location?: string;
+  gameUrl?: string;
+  capacity?: number;
+  durationMinutes?: number;
+  tournamentFormat?: 'SINGLE_ELIMINATION' | 'ROUND_ROBIN';
+  templateId?: string;
+  rounds?: Array<{ prompt: string; choices: string[]; answerIndex: number }>;
+}
+
+export interface CircleEventGame {
+  id: string;
+  title: string;
+  startsAt: string;
+  closesAt: string;
+  canPlay: boolean;
+  rounds: Array<{ id: string; position: number; prompt: string; choices: string[] }>;
+  score: number | null;
+  leaderboard: Array<{ score: number; username: string | null; name: string }>;
+}
+
 export interface Comment {
   id: string;
   content: string;
@@ -130,7 +171,7 @@ async function parseError(res: Response) {
   return Array.isArray(body.message) ? body.message.join(', ') : body.message;
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function requestOnce<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   try {
     const res = await fetch(`${API_BASE}${path}`, {
@@ -142,38 +183,99 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       },
     });
 
-    if (res.status === 401 && path === '/auth/refresh') {
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      if (typeof window !== 'undefined') window.location.href = '/login';
-    }
-
     if (!res.ok) {
-      if (res.status === 401 && !path.startsWith('/auth/')) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-          window.location.href = '/login';
-        }
-      }
       const message = await parseError(res);
-      throw new Error(message || 'Request failed');
+      throw Object.assign(new Error(message || 'Request failed'), { status: res.status });
     }
 
     if (res.status === 204) return undefined as T;
     return res.json();
   } catch (err: any) {
     if (err.name === 'TypeError' && (err.message === 'Failed to fetch' || err.message.includes('fetch'))) {
-      throw new Error('Cannot connect to backend server. Please verify backend is running on http://localhost:3000.');
+      throw new Error('Could not reach Zynqora. Check your connection and try again.');
     }
     throw err;
   }
 }
 
+type AuthResponse = { token: string; refreshToken: string; user: User };
+
+let refreshInFlight: Promise<AuthResponse> | null = null;
+
+function clearAuthSession() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('user');
+  window.dispatchEvent(new Event('auth-session-expired'));
+}
+
+function refreshSession(refreshToken = localStorage.getItem('refreshToken') || ''): Promise<AuthResponse> {
+  if (!refreshToken) {
+    clearAuthSession();
+    return Promise.reject(new Error('Your session has expired. Please sign in again.'));
+  }
+
+  if (!refreshInFlight) {
+    refreshInFlight = fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const message = await parseError(res);
+        clearAuthSession();
+        throw new Error(message || 'Your session has expired. Please sign in again.');
+      }
+      const auth = await res.json() as AuthResponse;
+      localStorage.setItem('token', auth.token);
+      localStorage.setItem('refreshToken', auth.refreshToken);
+      localStorage.setItem('user', JSON.stringify(auth.user));
+      window.dispatchEvent(new CustomEvent('auth-session-refreshed', { detail: auth.user }));
+      return auth;
+    }).catch((error: unknown) => {
+      if (error instanceof TypeError) {
+        throw new Error('Cannot connect to the authentication service. Check your connection and try again.');
+      }
+      throw error;
+    }).finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  try {
+    return await requestOnce<T>(path, options);
+  } catch (error) {
+    const status = typeof error === 'object' && error !== null && 'status' in error
+      ? (error as { status?: number }).status
+      : undefined;
+    const canRefresh = status === 401
+      && (path === '/auth/me' || !path.startsWith('/auth/'))
+      && Boolean(getToken());
+    if (!canRefresh) throw error;
+    if (!localStorage.getItem('refreshToken')) {
+      clearAuthSession();
+      throw error;
+    }
+
+    await refreshSession();
+    try {
+      return await requestOnce<T>(path, options);
+    } catch (retryError) {
+      const retryStatus = typeof retryError === 'object' && retryError !== null && 'status' in retryError
+        ? (retryError as { status?: number }).status
+        : undefined;
+      if (retryStatus === 401) clearAuthSession();
+      throw retryError;
+    }
+  }
+}
+
 
 export const api = {
-  signup: (data: { email: string; username: string; password: string; name: string }) =>
+  signup: (data: { email: string; username: string; password: string; name: string; interests?: string[] }) =>
     request<{ token: string; refreshToken: string; user: User; recoveryCode: string }>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -184,11 +286,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  refresh: (refreshToken: string) =>
-    request<{ token: string; refreshToken: string; user: User }>('/auth/refresh', {
+  loginWithGoogle: (idToken: string) =>
+    request<{ token: string; refreshToken: string; user: User; recoveryCode?: string }>('/auth/google', {
       method: 'POST',
-      body: JSON.stringify({ refreshToken }),
+      body: JSON.stringify({ idToken }),
     }),
+  getGoogleAuthChallenge: () =>
+    request<{ nonce: string }>('/auth/google/challenge', { method: 'POST' }),
+  refresh: (refreshToken: string) => refreshSession(refreshToken),
+  getCurrentUser: () => request<User>('/auth/me'),
   logout: () => request<{ message: string }>('/auth/logout', { method: 'POST' }),
   checkUsername: (username: string) =>
     request<{ available: boolean; valid: boolean; message: string }>(`/auth/username-availability?username=${encodeURIComponent(username)}`),
@@ -200,6 +306,7 @@ export const api = {
   getFollowers: (username: string, cursor?: string) => request<any[]>(`/users/${username}/followers${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
   getFollowing: (username: string, cursor?: string) => request<any[]>(`/users/${username}/following${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`),
   getNotifications: () => request<any[]>('/users/me/notifications'),
+  getWeeklyDigest: () => request<{ from: string; to: string; socialActivity: number; circleActivity: number }>('/users/me/digest'),
   registerDeviceToken: (data: { token: string; platform: 'android' | 'ios' }) =>
     request<{ id: string; token: string; platform: string }>('/users/me/device-tokens', { method: 'POST', body: JSON.stringify(data) }),
   removeDeviceToken: (token: string) =>
@@ -218,12 +325,68 @@ export const api = {
 
   updatePrivacy: (data: { profileVisibility?: string; followersVisibility?: string; followingVisibility?: string }) =>
     request('/users/me/privacy', { method: 'PATCH', body: JSON.stringify(data) }),
+  getPreferences: () => request<{ interests: string[]; notifySocialActivity: boolean; notifyCircleActivity: boolean; weeklyDigestEnabled: boolean }>('/users/me/preferences'),
+  updatePreferences: (data: { interests?: string[]; notifySocialActivity?: boolean; notifyCircleActivity?: boolean; weeklyDigestEnabled?: boolean }) =>
+    request<{ interests: string[]; notifySocialActivity: boolean; notifyCircleActivity: boolean; weeklyDigestEnabled: boolean }>('/users/me/preferences', { method: 'PATCH', body: JSON.stringify(data) }),
   deleteAccount: () => request<{ deleted: boolean }>('/users/me', { method: 'DELETE' }),
 
   follow: (username: string) => request(`/users/${username}/follow`, { method: 'POST' }),
   unfollow: (username: string) => request(`/users/${username}/unfollow`, { method: 'POST' }),
 
-  getCircles: () => request<Array<{ id: string; slug: string; name: string; description?: string | null; icon?: string | null; memberCount: number; postCount: number | null; isMember: boolean }>>('/circles'),
+  getCircles: () => request<Array<{ id: string; slug: string; name: string; description: string | null; category: string; icon: string | null; memberCount: number; postCount: number | null; isMember: boolean; recommended: boolean }>>('/circles'),
+  createCircle: (data: { name: string; category: string; description: string }) =>
+    request<{ id: string; slug: string; name: string; description: string; category: string; icon: null; memberCount: number; postCount: number; isMember: boolean; recommended: boolean }>('/circles', { method: 'POST', body: JSON.stringify(data) }),
+  getCircle: (slug: string) => request<{
+    id: string;
+    slug: string;
+    name: string;
+    category: string;
+    description: string | null;
+    icon: string | null;
+    memberCount: number;
+    postCount: number;
+    isMember: boolean;
+    members: Array<{ id: string; username: string; name: string; avatarUrl: string | null; profileImage?: string | null; category?: string | null }>;
+    events: Array<{
+      id: string;
+      kind: CircleActivityIdea['kind'];
+      mode: CircleActivityIdea['mode'];
+      gameMode: 'EXTERNAL' | 'NATIVE_TRIVIA';
+      gameRoundCount: number;
+      status: 'UPCOMING' | 'LIVE' | 'ENDED';
+      title: string;
+      description: string | null;
+      startsAt: string;
+      location: string | null;
+      gameUrl: string | null;
+      capacity: number | null;
+      durationMinutes: number | null;
+      tournamentFormat: 'SINGLE_ELIMINATION' | 'ROUND_ROBIN' | null;
+      participantCount: number;
+      isGoing: boolean;
+      attendees: Array<{ id: string; username: string; name: string; avatarUrl: string | null; profileImage?: string | null }>;
+      creator: { id: string; username: string; name: string };
+    }>;
+    activityIdeas: CircleActivityIdea[];
+    pinnedPosts: Array<{ postId: string; createdAt: string; pinnedBy: { username: string }; post: Post }>;
+    prompt: null | { id: string; title: string; body: string; category: string; endsAt: string; participantCount: number; isParticipating: boolean };
+  }>(`/circles/${encodeURIComponent(slug)}`),
+  createCircleEvent: (slug: string, data: CircleEventDraft) =>
+    request(`/circles/${encodeURIComponent(slug)}/events`, { method: 'POST', body: JSON.stringify(data) }),
+  joinCircleEvent: (slug: string, eventId: string) =>
+    request<{ going: boolean; eventId: string }>(`/circles/${encodeURIComponent(slug)}/events/${encodeURIComponent(eventId)}/rsvp`, { method: 'POST' }),
+  leaveCircleEvent: (slug: string, eventId: string) =>
+    request<{ going: boolean; eventId: string }>(`/circles/${encodeURIComponent(slug)}/events/${encodeURIComponent(eventId)}/rsvp`, { method: 'DELETE' }),
+  getCircleEventGame: (slug: string, eventId: string) =>
+    request<CircleEventGame>(`/circles/${encodeURIComponent(slug)}/events/${encodeURIComponent(eventId)}/game`),
+  submitCircleEventGame: (slug: string, eventId: string, answers: number[]) =>
+    request<{ score: number; totalRounds: number; submittedAt: string }>(`/circles/${encodeURIComponent(slug)}/events/${encodeURIComponent(eventId)}/game/submission`, { method: 'POST', body: JSON.stringify({ answers }) }),
+  setPromptParticipation: (slug: string, promptId: string, participating: boolean) =>
+    request<{ participating: boolean }>(`/circles/${encodeURIComponent(slug)}/prompts/${encodeURIComponent(promptId)}/participation`, { method: 'POST', body: JSON.stringify({ participating }) }),
+  pinCirclePost: (slug: string, postId: string) =>
+    request(`/circles/${encodeURIComponent(slug)}/posts/${encodeURIComponent(postId)}/pin`, { method: 'POST' }),
+  unpinCirclePost: (slug: string, postId: string) =>
+    request<{ unpinned: boolean }>(`/circles/${encodeURIComponent(slug)}/posts/${encodeURIComponent(postId)}/pin`, { method: 'DELETE' }),
   joinCircle: (slug: string) => request<{ joined: boolean; slug: string }>(`/circles/${encodeURIComponent(slug)}/join`, { method: 'POST' }),
   leaveCircle: (slug: string) => request<{ joined: boolean; slug: string }>(`/circles/${encodeURIComponent(slug)}/leave`, { method: 'DELETE' }),
 
@@ -261,7 +424,8 @@ export const api = {
   getConversations: () => request<Array<{ id: string; status: string; requesterId?: string; lastMessage: any; user: User }>>('/chat/conversations'),
   postMessage: (conversationId: string, content: string) =>
     request(`/chat/conversation/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ content }) }),
-  getMessages: (conversationId: string) => request<any[]>(`/chat/conversation/${conversationId}/messages`),
+  getMessages: (conversationId: string, afterId?: string) =>
+    request<any[]>(`/chat/conversation/${conversationId}/messages${afterId ? `?after=${encodeURIComponent(afterId)}` : ''}`),
   updateChatRequest: (conversationId: string, status: 'ACCEPTED' | 'REJECTED') => request<any>(`/chat/conversation/${conversationId}/request/${status}`, { method: 'POST' }),
   // Uploads / presign
   presignUpload: (filename: string, contentType: string) =>

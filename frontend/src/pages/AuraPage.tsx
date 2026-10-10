@@ -38,60 +38,6 @@ export default function AuraPage() {
     storyIndex: number;
   } | null>(null);
 
-  // High-fidelity fallback sample stories if no live user stories exist yet
-  const sampleStories: StoryItem[] = [
-    {
-      id: 'aura-s1',
-      title: 'alexrivera',
-      authorName: 'Alex Rivera',
-      vibe: '⚡ In the Zone',
-      caption: 'Building the next evolution of social networks 🚀',
-      authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&h=120&fit=crop',
-      mediaUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=800&fit=crop',
-      createdAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    },
-    {
-      id: 'aura-s2',
-      title: 'sarahchen',
-      authorName: 'Sarah Chen',
-      vibe: '✨ Deep Flow',
-      caption: 'Studio lighting setup is finally tuned! Late night editing session.',
-      authorAvatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=120&h=120&fit=crop',
-      mediaUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&fit=crop',
-      createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    },
-    {
-      id: 'aura-s3',
-      title: 'elena_sound',
-      authorName: 'Elena Rostova',
-      vibe: '🎧 Audio & Music',
-      caption: 'Testing analog synths for tomorrow’s live stream broadcast 🎹',
-      authorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&h=120&fit=crop',
-      mediaUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&fit=crop',
-      createdAt: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
-    },
-    {
-      id: 'aura-s4',
-      title: 'david_k',
-      authorName: 'David Kim',
-      vibe: '🔥 High Energy',
-      caption: 'Sprint finish with the community! 4.2k lines of code shipped.',
-      authorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&h=120&fit=crop',
-      mediaUrl: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&fit=crop',
-      createdAt: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-    },
-    {
-      id: 'aura-s5',
-      title: 'maya_design',
-      authorName: 'Maya Patel',
-      vibe: '🌙 Night Owl',
-      caption: 'Neon aesthetics and dark glassmorphism. Loving this vibe.',
-      authorAvatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=120&h=120&fit=crop',
-      mediaUrl: 'https://images.unsplash.com/photo-1508739773434-c26b3d09e071?w=800&fit=crop',
-      createdAt: new Date(Date.now() - 1000 * 60 * 480).toISOString(),
-    },
-  ];
-
   const loadStories = async () => {
     try {
       setLoading(true);
@@ -108,7 +54,7 @@ export default function AuraPage() {
     loadStories();
   }, []);
 
-  const displayedStories = activeStories.length > 0 ? activeStories : sampleStories;
+  const displayedStories = activeStories;
 
   // Filter by vibe if selected
   const filteredStories = selectedVibeFilter === 'ALL'
@@ -134,12 +80,12 @@ export default function AuraPage() {
   );
 
   const vibes = [
-    { id: 'ALL', label: 'All Auras', icon: '✨' },
-    { id: 'zone', label: 'In the Zone', icon: '⚡' },
-    { id: 'flow', label: 'Deep Flow', icon: '🌊' },
-    { id: 'energy', label: 'High Energy', icon: '🔥' },
-    { id: 'music', label: 'Sound & Music', icon: '🎧' },
-    { id: 'night', label: 'Night Owl', icon: '🌙' },
+    { id: 'ALL', label: 'All moments' },
+    { id: 'zone', label: 'In the Zone' },
+    { id: 'flow', label: 'Deep Flow' },
+    { id: 'energy', label: 'High Energy' },
+    { id: 'music', label: 'Sound & Music' },
+    { id: 'night', label: 'Night Owl' },
   ];
 
   return (
@@ -167,13 +113,13 @@ export default function AuraPage() {
           className="zq-aura-post-trigger-btn"
           onClick={() => setShowRecorder(true)}
         >
-          <span style={{ fontSize: '18px' }}>⚡</span>
+          <span aria-hidden="true">+</span>
           <span>Post Your Aura</span>
         </button>
       </div>
 
       {/* Vibe Category Filter Pills */}
-      <div className="zq-aura-filters-bar">
+      <div className="zq-aura-filters-bar" role="group" aria-label="Filter Aura moments">
         {vibes.map((v) => (
           <button
             key={v.id}
@@ -181,7 +127,6 @@ export default function AuraPage() {
             className={`zq-aura-filter-pill ${selectedVibeFilter === v.id ? 'active' : ''}`}
             onClick={() => setSelectedVibeFilter(v.id)}
           >
-            <span>{v.icon}</span>
             <span>{v.label}</span>
           </button>
         ))}
@@ -228,7 +173,7 @@ export default function AuraPage() {
                 setShowRecorder(true);
               }}
             >
-              <span>📸</span> Open Camera
+              <span>Create a moment</span>
             </button>
           </div>
         </div>
@@ -334,6 +279,14 @@ export default function AuraPage() {
             </div>
           );
         })}
+        {!loading && !filteredStories.length && (
+          <section className="zq-aura-empty-state">
+            <span className="zq-aura-empty-mark" aria-hidden="true">A</span>
+            <h2>{activeStories.length ? 'No moments in this category yet' : 'Your community’s moments will appear here'}</h2>
+            <p>Share a short photo or video to start today’s story.</p>
+            <button type="button" className="zq-aura-quick-create-btn" onClick={() => setShowRecorder(true)}>Create a moment</button>
+          </section>
+        )}
       </div>
 
       {/* Story Recorder Modal */}

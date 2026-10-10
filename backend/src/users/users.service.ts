@@ -84,6 +84,41 @@ export class UsersService {
     });
   }
 
+  async getPreferences(userId: string) {
+    return this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: {
+        interests: true,
+        notifySocialActivity: true,
+        notifyCircleActivity: true,
+        weeklyDigestEnabled: true,
+      },
+    });
+  }
+
+  async updatePreferences(userId: string, data: {
+    interests?: string[];
+    notifySocialActivity?: boolean;
+    notifyCircleActivity?: boolean;
+    weeklyDigestEnabled?: boolean;
+  }) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        interests: data.interests,
+        notifySocialActivity: data.notifySocialActivity,
+        notifyCircleActivity: data.notifyCircleActivity,
+        weeklyDigestEnabled: data.weeklyDigestEnabled,
+      },
+      select: {
+        interests: true,
+        notifySocialActivity: true,
+        notifyCircleActivity: true,
+        weeklyDigestEnabled: true,
+      },
+    });
+  }
+
   async deleteAccount(userId: string) {
     await this.prisma.$transaction(async (tx: any) => {
       await tx.comment.deleteMany({ where: { authorId: userId } });
@@ -135,12 +170,40 @@ export class UsersService {
   }
 
   async getNotifications(userId: string) {
-    return this.prisma.notification.findMany({
+    const preferences = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { notifySocialActivity: true, notifyCircleActivity: true },
+    });
+    const notifications = await this.prisma.notification.findMany({
       where: { recipientId: userId },
       orderBy: { createdAt: 'desc' },
-      take: 30,
+      take: 100,
       include: { actor: { select: { username: true, name: true, avatarUrl: true, profileImage: true } } },
     });
+    return notifications
+      .filter((notification) => notification.type === 'CIRCLE_EVENT'
+        ? preferences.notifyCircleActivity
+        : preferences.notifySocialActivity)
+      .slice(0, 30);
+  }
+
+  async getWeeklyDigest(userId: string) {
+    const preferences = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { weeklyDigestEnabled: true },
+    });
+    if (!preferences.weeklyDigestEnabled) throw new ForbiddenException('Enable the weekly recap in notification settings first');
+    const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const notifications = await this.prisma.notification.findMany({
+      where: { recipientId: userId, createdAt: { gte: from } },
+      select: { type: true },
+    });
+    return {
+      from,
+      to: new Date(),
+      socialActivity: notifications.filter((item) => item.type !== 'CIRCLE_EVENT').length,
+      circleActivity: notifications.filter((item) => item.type === 'CIRCLE_EVENT').length,
+    };
   }
 
   async registerDeviceToken(userId: string, data: { token: string; platform: 'android' | 'ios' }) {

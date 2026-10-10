@@ -12,9 +12,9 @@ const ChatPage = React.lazy(() => import('./pages/Chat'));
 const FollowersPage = React.lazy(() => import('./pages/Followers'));
 const FollowingPage = React.lazy(() => import('./pages/Following'));
 const AuraPage = React.lazy(() => import('./pages/AuraPage'));
+const CreatePostModal = React.lazy(() => import('./components/CreatePostModal'));
 import Sidebar from './components/Sidebar';
 import FloatingMessagesWidget from './components/FloatingMessagesWidget';
-import CreatePostModal from './components/CreatePostModal';
 import AuthNotice from './components/AuthNotice';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -24,7 +24,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, isInitializing } = useAuth();
   const location = useLocation();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState(() => localStorage.getItem('pendingRecoveryCode') || '');
@@ -38,6 +38,15 @@ export default function App() {
     window.addEventListener('recovery-code-created', refresh);
     return () => window.removeEventListener('recovery-code-created', refresh);
   }, []);
+
+  if (isInitializing) {
+    return (
+      <div className="zq-auth-session-loading" role="status" aria-live="polite">
+        <span className="zq-auth-power-orbit" aria-hidden="true"><span /></span>
+        <span>Restoring your secure session…</span>
+      </div>
+    );
+  }
 
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
 
@@ -173,15 +182,16 @@ export default function App() {
       {user && !isAuthPage && <FloatingMessagesWidget />}
 
       {/* Global Create Post Modal */}
-      {user && (
-        <CreatePostModal
-          isOpen={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
-          onPostCreated={() => {
-            // reload feed if on feed
-            window.dispatchEvent(new CustomEvent('ig-post-created'));
-          }}
-        />
+      {user && isCreateModalOpen && (
+        <Suspense fallback={<div className="zq-route-loading">Opening creator studio…</div>}>
+          <CreatePostModal
+            isOpen
+            onClose={() => setIsCreateModalOpen(false)}
+            onPostCreated={() => {
+              window.dispatchEvent(new CustomEvent('ig-post-created'));
+            }}
+          />
+        </Suspense>
       )}
       {recoveryCode && (
         <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 10000, width: 'min(360px, calc(100vw - 40px))' }}>

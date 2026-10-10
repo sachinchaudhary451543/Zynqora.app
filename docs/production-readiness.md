@@ -8,6 +8,18 @@
 - Deployment: Netlify static frontend, Render managed backend, Docker Compose for local Postgres.
 - Mobile: Capacitor Android wrapper is generated, security-hardened, and builds a debug APK; push/camera device workflows are not yet complete.
 
+## Community circles
+
+- Circle records and memberships are stored in the Prisma `Circle` and `CircleMember` models.
+- Authenticated `GET /api/circles` returns current database member/post counts and the requesting user's membership state; join/leave endpoints update membership idempotently.
+- Feed, Circles Hub, and Settings consume the live API. Circle filtering is preserved in the `/feed?circle=<slug>` URL.
+- Signup and Settings store private interest choices; matching circles are recommended without changing the user's membership.
+- Circle details include public-member discovery, opt-in weekly prompts, member-created events, group activities, tournament announcements, RSVP lists, and pinned posts. Members can host external game sessions or create multiple-choice quizzes that circle members play in-app once during the scheduled window; quiz answers are server-scored and not exposed in circle details. Tournament registration and format are supported; bracket progression/scoring is not.
+- The activity recommender is deterministic and explainable: it uses the circle topic, the signed-in member's saved interests, activity-type diversity, and template use in the last 30 days. It suggests group activities, not people; it has no dating/attraction score, and suggestions never enroll people or notify them automatically.
+- Notification preferences are persisted per user. The optional weekly recap is generated on demand from the previous seven days of activity; no push or email delivery is implied.
+- Use `npm run seed:circles` to upsert the five default circle definitions and current prompts without deleting users, posts, or memberships. Counts reflect actual records; the bootstrap does not manufacture members.
+- Migration history needs a deliberate PostgreSQL baseline decision: `migration_lock.toml` and historical migrations are SQLite-based, while production uses PostgreSQL on Supabase. Do not run `prisma db push` or `prisma migrate deploy` until that history is reconciled. The complete additive schema delta for the current release is in `backend/prisma/rollout/postgresql-application-upgrade.sql`; it is transaction-wrapped and was checked against production's current schema before rollout.
+
 ## Current build/test status
 
 - Baseline build: backend `npm run build` succeeded.

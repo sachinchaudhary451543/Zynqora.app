@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { api, getAvatarUrl } from '../api/client';
 import AvatarActionsModal from '../components/AvatarActionsModal';
 import ImageEditor from '../components/ImageEditor';
-import { COMMUNITY_CIRCLES } from '../data/communityCircles';
+import { COMMUNITY_CIRCLES_CHANGED, CommunityCircle } from '../data/communityCircles';
 import {
   SearchIcon,
   ShieldLockIcon,
@@ -51,6 +51,12 @@ export default function SettingsPage() {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [circles, setCircles] = useState<CommunityCircle[]>([]);
+  const [circlesLoading, setCirclesLoading] = useState(false);
+  const [busyCircle, setBusyCircle] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState({ interests: [] as string[], notifySocialActivity: true, notifyCircleActivity: true, weeklyDigestEnabled: false });
+  const [preferencesLoading, setPreferencesLoading] = useState(false);
+  const [digest, setDigest] = useState<{ from: string; to: string; socialActivity: number; circleActivity: number } | null>(null);
 
   // Avatar edit / upload state
   const [showAvatarModal, setShowAvatarModal] = useState(false);
@@ -76,6 +82,65 @@ export default function SettingsPage() {
         .catch(() => {});
     }
   }, [user?.username]);
+
+  useEffect(() => {
+    if (activeTab !== 'circles-management') return;
+    setCirclesLoading(true);
+    api.getCircles()
+      .then(setCircles)
+      .catch((err: unknown) => setErrorMsg(err instanceof Error ? err.message : 'Could not load circles.'))
+      .finally(() => setCirclesLoading(false));
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'sparks-notifications') return;
+    setPreferencesLoading(true);
+    api.getPreferences()
+      .then(setPreferences)
+      .catch((err: unknown) => setErrorMsg(err instanceof Error ? err.message : 'Could not load notification preferences.'))
+      .finally(() => setPreferencesLoading(false));
+  }, [activeTab]);
+
+  const savePreferences = async (update: Partial<typeof preferences>) => {
+    setPreferencesLoading(true);
+    setSuccessMsg('');
+    setErrorMsg('');
+    try {
+      const saved = await api.updatePreferences({ ...preferences, ...update });
+      setPreferences(saved);
+      setDigest(null);
+      if (user) setUserState({ ...user, ...saved });
+      setSuccessMsg('Your preferences have been saved.');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Could not save your preferences.');
+    } finally {
+      setPreferencesLoading(false);
+    }
+  };
+
+  const loadDigest = async () => {
+    setErrorMsg('');
+    try {
+      setDigest(await api.getWeeklyDigest());
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Could not load your weekly recap.');
+    }
+  };
+
+  const toggleCircleMembership = async (circle: CommunityCircle) => {
+    setBusyCircle(circle.slug);
+    setErrorMsg('');
+    try {
+      if (circle.isMember) await api.leaveCircle(circle.slug);
+      else await api.joinCircle(circle.slug);
+      setCircles(await api.getCircles());
+      window.dispatchEvent(new Event(COMMUNITY_CIRCLES_CHANGED));
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Could not update circle membership.');
+    } finally {
+      setBusyCircle(null);
+    }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -216,7 +281,7 @@ export default function SettingsPage() {
       {/* Right Content Form Area */}
       <div style={{ flex: 1, padding: '36px 44px', overflowY: 'auto' }}>
         <h2 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '24px', color: '#fff' }}>
-          {activeTab === 'aura-profile' ? 'Aura & Identity Settings' : 'Circle & Privacy Parameters'}
+          {activeTab === 'aura-profile' ? 'Aura & Identity Settings' : activeTab === 'sparks-notifications' ? 'Notification & recap controls' : activeTab === 'circles-management' ? 'Your community circles' : 'Circle & Privacy Parameters'}
         </h2>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', marginBottom: 20, borderRadius: 16, background: 'var(--zq-glass)', border: '1px solid var(--zq-glass-border)', boxShadow: 'inset 1px 1px rgba(255,255,255,.18), 0 10px 24px rgba(0,80,120,.12)' }}>
           <div><strong style={{ color: 'var(--zq-text-primary)' }}>Appearance</strong><div style={{ color: 'var(--zq-text-secondary)', fontSize: 12 }}>Light glass is the default. Dark mode is only for your device.</div></div>
@@ -397,8 +462,10 @@ export default function SettingsPage() {
             <p style={{ color: 'var(--zq-text-secondary)', fontSize: '13px', marginBottom: '20px' }}>
               Manage memberships and permissions across your community circles.
             </p>
+            {circlesLoading && <p role="status">Loading circles…</p>}
+            {!circlesLoading && circles.length === 0 && !errorMsg && <p>No circles are available yet.</p>}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {COMMUNITY_CIRCLES.filter((circle) => circle.id !== 'all').map((c) => (
+              {circles.filter((circle) => circle.slug !== 'all').map((c) => (
                 <div
                   key={c.id}
                   style={{
@@ -413,10 +480,18 @@ export default function SettingsPage() {
                 >
                   <div>
                     <div style={{ fontWeight: 800, color: '#fff', fontSize: '15px' }}>{c.name}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--zq-text-secondary)' }}>{c.count !== undefined ? `${c.count.toLocaleString()} members` : 'Community circle'} • {c.role || 'Member'}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--zq-text-secondary)' }}>
+                      {c.memberCount.toLocaleString()} {c.memberCount === 1 ? 'member' : 'members'}
+                    </div>
                   </div>
-                  <button className="zq-btn-glass" style={{ fontSize: '12px' }}>
-                    Configure
+                  <button
+                    type="button"
+                    className={c.isMember ? 'zq-btn-glass' : 'zq-btn-aura'}
+                    style={{ fontSize: '12px' }}
+                    disabled={busyCircle === c.slug}
+                    onClick={() => void toggleCircleMembership(c)}
+                  >
+                    {busyCircle === c.slug ? 'Saving…' : c.isMember ? 'Leave' : 'Join'}
                   </button>
                 </div>
               ))}
@@ -425,8 +500,55 @@ export default function SettingsPage() {
         )}
 
         {activeTab === 'sparks-notifications' && (
-          <div style={{ color: 'var(--zq-text-secondary)', padding: '24px 0' }}>
-            <p>Aura sparks and community notification parameters are actively tuned for real-time synchronization.</p>
+          <div className="zq-notification-preferences">
+            <p>Choose what reaches your activity inbox. These controls do not affect your ability to use circles or see their content.</p>
+            {preferencesLoading && <p role="status">Loading or saving preferences…</p>}
+            <label>
+              <span><strong>Social activity</strong><small>Follows, likes, comments, and other social notifications.</small></span>
+              <input type="checkbox" checked={preferences.notifySocialActivity} disabled={preferencesLoading} onChange={(event) => void savePreferences({ notifySocialActivity: event.target.checked })} />
+            </label>
+            <label>
+              <span><strong>Circle activity</strong><small>Updates about circle events and community activity.</small></span>
+              <input type="checkbox" checked={preferences.notifyCircleActivity} disabled={preferencesLoading} onChange={(event) => void savePreferences({ notifyCircleActivity: event.target.checked })} />
+            </label>
+            <label>
+              <span><strong>Weekly recap</strong><small>Opt in to an on-demand summary of your last seven days in Zynqora.</small></span>
+              <input type="checkbox" checked={preferences.weeklyDigestEnabled} disabled={preferencesLoading} onChange={(event) => void savePreferences({ weeklyDigestEnabled: event.target.checked })} />
+            </label>
+            <section className="zq-settings-interests">
+              <h3>Interests for circle suggestions</h3>
+              <p>These are private to you and only used to sort circle recommendations.</p>
+              <div className="zq-settings-interest-list">
+                {[
+                  { value: 'tech', label: 'Technology' },
+                  { value: 'creative', label: 'Creative work' },
+                  { value: 'gaming', label: 'Gaming' },
+                  { value: 'wellness', label: 'Wellness' },
+                  { value: 'family', label: 'Family & friends' },
+                ].map(({ value, label }) => (
+                  <label key={value} className="zq-interest-option">
+                    <input
+                      type="checkbox"
+                      checked={preferences.interests.includes(value)}
+                      disabled={preferencesLoading || (!preferences.interests.includes(value) && preferences.interests.length >= 5)}
+                      onChange={(event) => {
+                        const interests = event.target.checked
+                          ? [...preferences.interests, value]
+                          : preferences.interests.filter((interest) => interest !== value);
+                        void savePreferences({ interests });
+                      }}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </section>
+            {preferences.weeklyDigestEnabled && (
+              <section className="zq-weekly-recap">
+                <button type="button" className="zq-btn-glass" disabled={preferencesLoading} onClick={() => void loadDigest()}>Show my last 7 days</button>
+                {digest && <p role="status">Last 7 days: {digest.socialActivity} social updates and {digest.circleActivity} circle event updates.</p>}
+              </section>
+            )}
           </div>
         )}
       </div>

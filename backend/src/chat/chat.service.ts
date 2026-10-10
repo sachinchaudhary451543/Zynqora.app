@@ -94,8 +94,30 @@ export class ChatService {
     return message;
   }
 
-  async getMessages(conversationId: string, viewerId: string) {
+  async getMessages(conversationId: string, viewerId: string, afterId?: string) {
     await this.ensureParticipant(conversationId, viewerId);
+
+    if (afterId) {
+      const cursor = await (this.prisma as any).message.findFirst({
+        where: { id: afterId, conversationId },
+        select: { id: true },
+      });
+      if (!cursor) throw new NotFoundException('Message cursor not found in this conversation');
+
+      return (this.prisma as any).message.findMany({
+        where: { conversationId },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        cursor: { id: afterId },
+        skip: 1,
+        take: 200,
+        include: {
+          sender: {
+            select: { id: true, username: true, name: true, avatarUrl: true, profileImage: true },
+          },
+        },
+      });
+    }
+
     return (this.prisma as any).message.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'desc' },

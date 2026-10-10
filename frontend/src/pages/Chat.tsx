@@ -25,6 +25,17 @@ export default function ChatPage() {
   const [chatNotice, setChatNotice] = useState('');
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const latestMessageIdRef = useRef<string | undefined>(undefined);
+  const appendMessages = (incoming: any[]) => {
+    if (!incoming.length) return;
+    setMessages((current) => {
+      const byId = new Map(current.map((message) => [message.id, message]));
+      incoming.forEach((message) => byId.set(message.id, message));
+      return Array.from(byId.values()).sort((a, b) =>
+        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime() || a.id.localeCompare(b.id),
+      );
+    });
+  };
   const recordCall = (entry: { type: string; direction: string; status: string }) => {
     const key = `call-history:${user?.id || 'user'}:${activeUsername || 'unknown'}`;
     const next = [{ ...entry, at: new Date().toISOString() }, ...callHistory].slice(0, 30);
@@ -102,6 +113,9 @@ export default function ChatPage() {
     const initConv = async () => {
       setLoading(true);
       setChatNotice('');
+      setMessages([]);
+      latestMessageIdRef.current = undefined;
+      setConv(null);
       try {
         const c = await api.createConversation(activeUsername);
         setConv(c);
@@ -127,17 +141,27 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!conv?.id) return;
-    const interval = setInterval(async () => {
+    const refreshMessages = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
-        const ms = await api.getMessages(conv.id);
-        setMessages(ms || []);
+        const ms = await api.getMessages(conv.id, latestMessageIdRef.current);
+        appendMessages(ms || []);
       } catch (err) {
         // ignore polling error
       }
-    }, 3000);
+    };
+    const interval = setInterval(refreshMessages, 3000);
+    document.addEventListener('visibilitychange', refreshMessages);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', refreshMessages);
+    };
   }, [conv?.id]);
+
+  useEffect(() => {
+    latestMessageIdRef.current = messages[messages.length - 1]?.id;
+  }, [messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -151,8 +175,8 @@ export default function ChatPage() {
     if (!customText) setText('');
     try {
       await api.postMessage(conv.id, content);
-      const ms = await api.getMessages(conv.id);
-      setMessages(ms || []);
+      const ms = await api.getMessages(conv.id, latestMessageIdRef.current);
+      appendMessages(ms || []);
     } catch (err) {
       console.error('Failed to send message', err);
     }

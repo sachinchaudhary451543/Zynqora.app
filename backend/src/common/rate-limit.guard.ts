@@ -9,9 +9,14 @@ type RateLimitConfig = {
 };
 
 const ROUTE_LIMITS: Record<string, RateLimitConfig> = {
-  '/api/auth/login': { maxRequests: 5 },
-  '/api/auth/forgot-password': { maxRequests: 3 },
-  '/api/auth/reset-password': { maxRequests: 3 },
+  '/auth/login': { maxRequests: 5 },
+  '/auth/google/challenge': { maxRequests: 20 },
+  '/auth/google': { maxRequests: 10 },
+  '/auth/signup': { maxRequests: 5 },
+  '/auth/refresh': { maxRequests: 15 },
+  '/auth/username-availability': { maxRequests: 30 },
+  '/auth/forgot-password': { maxRequests: 3 },
+  '/auth/reset-password': { maxRequests: 3 },
 };
 
 @Injectable()
@@ -20,14 +25,15 @@ export class AuthRateLimitGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
-    const route = request.route?.path || request.originalUrl || request.url || '';
-    const limit = ROUTE_LIMITS[route] ?? ROUTE_LIMITS[request.path];
+    const route = (request.originalUrl || request.url || '').split('?')[0];
+    const routeKey = Object.keys(ROUTE_LIMITS).find((path) => route.endsWith(path));
+    const limit = routeKey ? ROUTE_LIMITS[routeKey] : undefined;
 
     if (!limit) {
       return true;
     }
 
-    const key = `${request.ip || 'unknown'}:${route}`;
+    const key = `${request.ip || 'unknown'}:${routeKey}`;
     const now = Date.now();
     const bucket = AuthRateLimitGuard.buckets.get(key);
 

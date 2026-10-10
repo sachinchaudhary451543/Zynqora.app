@@ -69,8 +69,9 @@ export default function CreatePostModal({ isOpen, onClose, onPostCreated }: Crea
   const liveStreamMediaRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
     api.getCircles().then((data) => setCircles(data.filter((c) => c.slug !== 'all' && c.id !== 'global'))).catch(() => {});
-  }, []);
+  }, [isOpen]);
 
   // Manage camera preview for Live stream tab
   useEffect(() => {

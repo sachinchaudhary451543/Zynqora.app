@@ -29,6 +29,9 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
+# Local duplicate checkout; the project is built from the repository root
+Zynqora.app/
+
 # Uploads and temporary files
 backend/prisma/*.db
 backend/prisma/*.db-*

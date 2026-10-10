@@ -47,11 +47,11 @@ It brings together profile discovery, posts, stories, chat, reactions, comments,
 
 <div align="center">
 
-| Landing / Login Concept | Product Feel |
-| --- | --- |
-| `ZYNQORA · SYNC · CORE · AURA` | Neon social dashboard |
+| Landing / Login Concept                   | Product Feel                               |
+| ----------------------------------------- | ------------------------------------------ |
+| `ZYNQORA · SYNC · CORE · AURA`            | Neon social dashboard                      |
 | `Your People. Your Circle. Your Zynqora.` | Real-time circles and aura-driven identity |
-| `Create Your Circle` | Community-first onboarding |
+| `Create Your Circle`                      | Community-first onboarding                 |
 
 </div>
 
@@ -208,19 +208,19 @@ Use `.env.example` files as templates. Do **not** commit real `.env` files.
 
 ### Backend
 
-| Variable | Purpose |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET` | Strong signing secret for authentication |
-| `JWT_EXPIRES_IN` | Token expiration window |
-| `PORT` | API server port |
-| `CORS_ORIGIN` | Allowed frontend origin in production |
+| Variable          | Purpose                                      |
+| ----------------- | -------------------------------------------- |
+| `DATABASE_URL`    | PostgreSQL connection string                 |
+| `JWT_SECRET`      | Strong signing secret for authentication     |
+| `JWT_EXPIRES_IN`  | Token expiration window                      |
+| `PORT`            | API server port                              |
+| `CORS_ORIGIN`     | Allowed frontend origin in production        |
 | `SERVER_BASE_URL` | Public backend URL for deployed environments |
 
 ### Frontend
 
-| Variable | Purpose |
-| --- | --- |
+| Variable        | Purpose                      |
+| --------------- | ---------------------------- |
 | `VITE_API_BASE` | Base URL for the backend API |
 
 ---
@@ -322,7 +322,7 @@ Also verify:
 
 <div align="center">
 
-  Built with ambition by **Sachin Kumar**
+Built with ambition by **Sachin Kumar**
 
   <p>
     <a href="https://github.com/sachinchaudhary451543"><img src="https://img.shields.io/badge/GitHub-sachinchaudhary451543-181717?style=for-the-badge&logo=github" alt="GitHub" /></a>

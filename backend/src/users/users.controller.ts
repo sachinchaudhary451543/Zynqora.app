@@ -5,6 +5,7 @@ import { UsersService } from './users.service';
 import { UpdateProfileDto, UpdatePrivacyDto } from './dto/update-profile.dto';
 import { RegisterDeviceTokenDto } from './dto/register-device-token.dto';
 import { RemoveDeviceTokenDto } from './dto/remove-device-token.dto';
+import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 
 @Controller('users')
 export class UsersController {
@@ -39,6 +40,21 @@ export class UsersController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('me/preferences')
+  getPreferences(@CurrentUser() user: { userId: string }) {
+    return this.usersService.getPreferences(user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/preferences')
+  updatePreferences(
+    @CurrentUser() user: { userId: string },
+    @Body() body: UpdatePreferencesDto,
+  ) {
+    return this.usersService.updatePreferences(user.userId, body);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Delete('me')
   deleteAccount(@CurrentUser() user: { userId: string }) {
     return this.usersService.deleteAccount(user.userId);
@@ -60,6 +76,12 @@ export class UsersController {
   @Get('me/notifications')
   getNotifications(@CurrentUser() user: { userId: string }) {
     return this.usersService.getNotifications(user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('me/digest')
+  getWeeklyDigest(@CurrentUser() user: { userId: string }) {
+    return this.usersService.getWeeklyDigest(user.userId);
   }
 
   @UseGuards(JwtAuthGuard)
