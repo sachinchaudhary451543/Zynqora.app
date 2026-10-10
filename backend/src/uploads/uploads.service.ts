@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { extname, join } from 'path';
 import { randomUUID } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
@@ -11,6 +11,7 @@ import {
 } from './upload-safety';
 
 const logger = new Logger('UploadsService');
+const MAX_INLINE_IMAGE_BYTES = 1024 * 1024;
 
 @Injectable()
 export class UploadsService {
@@ -141,12 +142,7 @@ export class UploadsService {
     try {
       const { buffer, contentType } = await this.fetchRemoteBufferWithType(url);
       assertAllowedUploadMime(contentType);
-      const ext = this.extensionForContentType(contentType);
-      const key = `${Date.now()}-${randomUUID()}.${ext}`;
-      const outPath = this.localPathForKey(key);
-      writeFileSync(outPath, buffer);
-      const publicUrl = this.publicUrlForKey(key);
-      return { key, publicUrl };
+      return await this.saveImageBuffer(buffer, contentType);
     } catch (e) {
       logger.error('fetchRemoteAndSave error: ' + e.message);
       throw e;
@@ -210,54 +206,92 @@ export class UploadsService {
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 25000);
-      const res = await fetch(aiEngineUrl, {
-        signal: controller.signal,
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-      });
-      clearTimeout(timeout);
-
-      if (res.ok) {
+      const timeout = setTimeout(() => controller.abort(), 60000);
+      try {
+        const res = await fetch(aiEngineUrl, {
+          signal: controller.signal,
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        });
+        if (!res.ok) throw new Error(`AI engine returned status ${res.status}`);
+        const generatedContentType = (res.headers.get('content-type') || 'image/jpeg').split(';')[0].toLowerCase();
+        if (!generatedContentType.startsWith('image/')) throw new Error('AI engine returned a non-image response');
+        assertAllowedUploadMime(generatedContentType);
         const buffer = Buffer.from(await res.arrayBuffer());
-        // Verify buffer is valid image (not 0 bytes)
-        if (buffer.length > 500) {
-          const key = `${Date.now()}-${randomUUID()}.jpg`;
-          const outPath = this.localPathForKey(key);
-          writeFileSync(outPath, buffer);
-          const publicUrl = this.publicUrlForKey(key);
-          return { key, publicUrl, prompt: finalPromptText, style, gender };
+        if (buffer.length <= 500 || buffer.length > MAX_UPLOAD_BYTES) {
+          throw new Error('AI engine returned an invalid image size');
         }
+        const saved = await this.saveImageBuffer(buffer, generatedContentType);
+        return { ...saved, prompt: finalPromptText, style, gender };
+      } finally {
+        clearTimeout(timeout);
       }
-      throw new Error(`AI Engine response invalid or empty (status: ${res.status})`);
     } catch (e: any) {
-      logger.warn(`Pollinations generator failed (${e.message}), generating dynamic seed-based avatar...`);
-      // Dynamic gender-aware high-resolution diverse avatars
-      const malePool = [
-        'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=800&q=80',
-      ];
-      const femalePool = [
-        'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=800&q=80',
-        'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=800&q=80',
-      ];
-      const pool = gender === 'female' ? femalePool : malePool;
-      const fallbackUrl = pool[rawSeed % pool.length];
-      return this.fetchRemoteAndSave(fallbackUrl);
+      logger.warn(`Pollinations generator failed: ${e.message}`);
+      throw new ServiceUnavailableException('AI image generation is temporarily unavailable. Please try again.');
     }
   }
 
   async modifyImageWithAi(options: { imageUrl?: string; prompt: string; style?: string; gender?: string }) {
+    if (!options.imageUrl) throw new BadRequestException('Choose a photo before starting an AI remaster.');
     const userPrompt = options.prompt || 'Remaster with cinematic volumetric lighting, neon aura, and ultra-sharp 8k details';
     logger.log(`Modifying image with AI: prompt="${userPrompt}", style="${options.style || 'auto'}", gender="${options.gender || 'male'}"`);
 
-    return this.generateRealisticAi(
-      userPrompt,
-      options.style,
-      Math.floor(Math.random() * 1000000),
-      options.gender || 'male'
-    );
+    let imageUrl: string;
+    try {
+      imageUrl = new URL(options.imageUrl, process.env.SERVER_BASE_URL ?? 'http://localhost:3000').toString();
+    } catch {
+      throw new BadRequestException('The selected photo URL is invalid.');
+    }
+    const localImageKey = this.getLocalUploadKey(imageUrl);
+    let contentType: string;
+    let buffer: Buffer;
+    if (localImageKey) {
+      const localPath = this.localPathForKey(localImageKey);
+      if (!existsSync(localPath)) throw new BadRequestException('The selected photo could not be found.');
+      buffer = readFileSync(localPath);
+      contentType = this.contentTypeForFilename(localImageKey);
+    } else {
+      assertSafeRemoteUrl(imageUrl);
+      ({ contentType, buffer } = await this.fetchRemoteBufferWithType(imageUrl));
+    }
+    if (!contentType.startsWith('image/')) throw new BadRequestException('The selected photo URL is not an image.');
+    assertAllowedUploadMime(contentType);
+    if (buffer.length > MAX_UPLOAD_BYTES) throw new BadRequestException('The selected photo exceeds the maximum size.');
+    const source = new URL(imageUrl);
+    const server = new URL(process.env.SERVER_BASE_URL ?? 'http://localhost:3000');
+    const imageReference = source.origin === server.origin && ['localhost', '127.0.0.1', '::1'].includes(source.hostname.replace(/^\[|\]$/g, ''))
+      ? this.localImageDataUrl(buffer, contentType)
+      : imageUrl;
+
+    const prompt = `${userPrompt.trim()}${options.style ? `, ${options.style} visual style` : ''}${options.gender ? `, subject presentation: ${options.gender}` : ''}, preserve the identity and recognizable facial features of the reference photo`;
+    const query = new URLSearchParams({
+      image: imageReference,
+      width: '768',
+      height: '768',
+      nologo: 'true',
+      private: 'true',
+      seed: String(Math.floor(Math.random() * 1000000)),
+    });
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${query.toString()}`;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 60000);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error(`AI engine returned status ${response.status}`);
+        const outputType = (response.headers.get('content-type') || '').split(';')[0].toLowerCase();
+        if (!outputType.startsWith('image/')) throw new Error('AI engine returned a non-image response');
+        const output = Buffer.from(await response.arrayBuffer());
+        if (output.length <= 500 || output.length > MAX_UPLOAD_BYTES) throw new Error('AI engine returned an invalid image size');
+        const saved = await this.saveImageBuffer(output, outputType);
+        return { ...saved, prompt, style: options.style, gender: options.gender };
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch (error) {
+      logger.warn(`Pollinations image remaster failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+      throw new ServiceUnavailableException('AI photo remastering is temporarily unavailable. Please try again.');
+    }
   }
 
   async generateAi(seed?: string) {
@@ -303,9 +337,66 @@ export class UploadsService {
     return extname(contentType) || 'jpg';
   }
 
+  private contentTypeForFilename(filename: string) {
+    const extension = extname(filename).toLowerCase();
+    const types: Record<string, string> = {
+      '.gif': 'image/gif',
+      '.jpeg': 'image/jpeg',
+      '.jpg': 'image/jpeg',
+      '.png': 'image/png',
+      '.svg': 'image/svg+xml',
+      '.webp': 'image/webp',
+    };
+    const contentType = types[extension];
+    if (!contentType) throw new BadRequestException('The selected photo has an unsupported image format.');
+    return contentType;
+  }
+
+  private getLocalUploadKey(imageUrl: string) {
+    const base = new URL(process.env.SERVER_BASE_URL ?? 'http://localhost:3000');
+    const source = new URL(imageUrl);
+    if (source.origin !== base.origin || !source.pathname.startsWith('/uploads/')) return null;
+    try {
+      return decodeURIComponent(source.pathname.slice('/uploads/'.length));
+    } catch {
+      throw new BadRequestException('The selected photo URL is invalid.');
+    }
+  }
+
+  private localImageDataUrl(buffer: Buffer, contentType: string) {
+    if (buffer.length > MAX_INLINE_IMAGE_BYTES) {
+      throw new BadRequestException('For local remastering, use an image smaller than 1 MB or test with the deployed app.');
+    }
+    return `data:${contentType};base64,${buffer.toString('base64')}`;
+  }
+
+  private async saveImageBuffer(buffer: Buffer, contentType: string) {
+    assertAllowedUploadMime(contentType);
+    if (buffer.length > MAX_UPLOAD_BYTES) throw new BadRequestException('Image file is too large');
+    const key = `${Date.now()}-${randomUUID()}.${this.extensionForContentType(contentType)}`;
+
+    if (this.usingS3()) {
+      const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+      const client = new S3Client({ region: process.env.AWS_REGION });
+      const bucket = process.env.AWS_S3_BUCKET;
+      await client.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      }));
+      return {
+        key,
+        publicUrl: `https://${bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`,
+      };
+    }
+
+    writeFileSync(this.localPathForKey(key), buffer);
+    return { key, publicUrl: this.publicUrlForKey(key) };
+  }
+
   private publicUrlForKey(key: string) {
     const serverBase = process.env.SERVER_BASE_URL ?? 'http://localhost:3000';
     return `${serverBase}/uploads/${key}`;
   }
 }
-

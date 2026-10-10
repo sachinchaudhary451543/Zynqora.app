@@ -168,6 +168,7 @@ export default function CommentsSection({ postId, initialCount = 0, onCommentAdd
       >
         <input
           type="text"
+          aria-label="Write a new post"
           placeholder="Sync a thought..."
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}

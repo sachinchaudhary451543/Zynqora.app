@@ -4,13 +4,16 @@ import { Server, Socket } from 'socket.io';
 
 type SignalPayload = { targetUserId: string; signal: unknown; callId: string };
 type LiveRoom = { broadcasterId: string; title: string; startedAt: string };
+type CallParticipants = { callerId: string; targetUserId: string };
 
 @WebSocketGateway({ namespace: '/realtime', cors: { origin: true, credentials: true } })
 export class RealtimeGateway {
   @WebSocketServer() server!: Server;
   private readonly socketsByUser = new Map<string, Set<string>>();
   private readonly userBySocket = new Map<string, string>();
-  private readonly pendingSignals = new Map<string, Array<{ fromUserId: string; signal: unknown }>>();
+  private readonly pendingSignals = new Map<string, Array<{ fromUserId: string; targetUserId: string; signal: unknown }>>();
+  private readonly callParticipants = new Map<string, CallParticipants>();
+  private readonly joinedCalls = new Map<string, Set<string>>();
   private readonly liveRooms = new Map<string, LiveRoom>();
 
   constructor(private readonly jwt: JwtService) {}
@@ -47,35 +50,59 @@ export class RealtimeGateway {
     if (!socket.data.userId || body.targetUserId === socket.data.userId) {
       throw new Error('Unauthorized call invite');
     }
+    this.callParticipants.set(body.callId, { callerId: socket.data.userId, targetUserId: body.targetUserId });
     this.emitToUser(body.targetUserId, 'call:incoming', { ...body, fromUserId: socket.data.userId });
   }
 
   @SubscribeMessage('call:signal')
   signal(@ConnectedSocket() socket: Socket, @MessageBody() body: SignalPayload) {
     if (!socket.data.userId) throw new Error('Unauthorized call signal');
-    const queued = this.pendingSignals.get(body.callId) || [];
-    queued.push({ fromUserId: socket.data.userId, signal: body.signal });
-    this.pendingSignals.set(body.callId, queued.slice(-10));
+    const participants = this.callParticipants.get(body.callId);
+    if (!participants || !this.isCallParticipant(participants, socket.data.userId, body.targetUserId)) {
+      throw new Error('Unauthorized call signal');
+    }
+    if (!this.joinedCalls.get(body.callId)?.has(body.targetUserId)) {
+      const queued = this.pendingSignals.get(body.callId) || [];
+      queued.push({ fromUserId: socket.data.userId, targetUserId: body.targetUserId, signal: body.signal });
+      this.pendingSignals.set(body.callId, queued.slice(-20));
+    }
     this.emitToUser(body.targetUserId, 'call:signal', { ...body, fromUserId: socket.data.userId });
   }
 
   @SubscribeMessage('call:join')
-  join(@ConnectedSocket() socket: Socket, @MessageBody() body: { callId: string; targetUserId: string }) {
+  join(@ConnectedSocket() socket: Socket, @MessageBody() body: { callId: string }) {
     if (!socket.data.userId) throw new Error('Unauthorized call join');
-    if (body.targetUserId !== socket.data.userId && body.targetUserId !== undefined) {
+    const participants = this.callParticipants.get(body.callId);
+    if (!participants || !this.isCallParticipant(participants, socket.data.userId)) {
       throw new Error('Unauthorized call join');
     }
+    const joined = this.joinedCalls.get(body.callId) || new Set<string>();
+    joined.add(socket.data.userId);
+    this.joinedCalls.set(body.callId, joined);
     const queued = this.pendingSignals.get(body.callId) || [];
+    const remaining: typeof queued = [];
     for (const item of queued) {
-      socket.emit('call:signal', { callId: body.callId, fromUserId: item.fromUserId, targetUserId: socket.data.userId, signal: item.signal });
+      if (item.targetUserId === socket.data.userId) {
+        socket.emit('call:signal', { callId: body.callId, fromUserId: item.fromUserId, targetUserId: item.targetUserId, signal: item.signal });
+      } else {
+        remaining.push(item);
+      }
     }
+    if (remaining.length) this.pendingSignals.set(body.callId, remaining);
+    else this.pendingSignals.delete(body.callId);
   }
 
   @SubscribeMessage('call:end')
   end(@ConnectedSocket() socket: Socket, @MessageBody() body: { targetUserId: string; callId: string }) {
     if (!socket.data.userId) throw new Error('Unauthorized call end');
+    const participants = this.callParticipants.get(body.callId);
+    if (!participants || !this.isCallParticipant(participants, socket.data.userId, body.targetUserId)) {
+      throw new Error('Unauthorized call end');
+    }
     this.emitToUser(body.targetUserId, 'call:ended', { ...body, fromUserId: socket.data.userId });
     this.pendingSignals.delete(body.callId);
+    this.callParticipants.delete(body.callId);
+    this.joinedCalls.delete(body.callId);
   }
 
   @SubscribeMessage('live:start')
@@ -114,5 +141,12 @@ export class RealtimeGateway {
 
   private emitToUser(userId: string, event: string, payload: unknown) {
     for (const socketId of this.socketsByUser.get(userId) || []) this.server.to(socketId).emit(event, payload);
+  }
+
+  private isCallParticipant(participants: CallParticipants, userId: string, otherUserId?: string) {
+    return userId === participants.callerId
+      ? otherUserId === undefined || otherUserId === participants.targetUserId
+      : userId === participants.targetUserId
+        && (otherUserId === undefined || otherUserId === participants.callerId);
   }
 }

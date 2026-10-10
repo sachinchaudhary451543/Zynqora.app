@@ -180,7 +180,7 @@ export default function SettingsPage() {
     setShowAvatarModal(false);
     try {
       setSaving(true);
-      const res = await api.uploadLocal(file);
+      const res = await api.uploadMedia(file);
       await api.updateProfile({ profileImage: res.publicUrl });
       if (setUserState && user) {
         setUserState({ ...user, profileImage: `${res.publicUrl}?v=${Date.now()}` });
@@ -216,25 +216,26 @@ export default function SettingsPage() {
       <div className="zq-settings-nav">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 8px 8px 8px' }}>
           <span className="zq-pulse-orb" />
-          <h2 style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '0.5px', color: '#fff' }}>
+          <h1 style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '0.5px', color: '#fff', margin: 0 }}>
             CONTROL CENTER
-          </h2>
+          </h1>
         </div>
 
-        <div style={{ position: 'relative', marginBottom: '8px' }}>
+        <div className="zq-settings-search" style={{ position: 'relative', marginBottom: '8px' }}>
           <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--zq-text-muted)', display: 'flex' }}>
             <SearchIcon size={16} />
           </span>
           <input
             className="zq-settings-input"
             style={{ paddingLeft: '36px', fontSize: '13px' }}
+            aria-label="Search preferences"
             placeholder="Search preferences..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div className="zq-settings-tabs" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <button
             className={`zq-nav-item ${activeTab === 'aura-profile' ? 'active' : ''}`}
             onClick={() => setActiveTab('aura-profile')}
@@ -268,7 +269,7 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        <div style={{ marginTop: 'auto', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', border: '1px solid var(--zq-glass-border)' }}>
+        <div className="zq-settings-security-note" style={{ marginTop: 'auto', padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', border: '1px solid var(--zq-glass-border)' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--zq-accent-cyan)', marginBottom: '4px' }}>
             ZYNQORA SECURITY CORE
           </div>
@@ -279,7 +280,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Right Content Form Area */}
-      <div style={{ flex: 1, padding: '36px 44px', overflowY: 'auto' }}>
+      <div className="zq-settings-content" style={{ flex: 1, padding: '36px 44px', overflowY: 'auto' }}>
         <h2 style={{ fontSize: '22px', fontWeight: 800, marginBottom: '24px', color: '#fff' }}>
           {activeTab === 'aura-profile' ? 'Aura & Identity Settings' : activeTab === 'sparks-notifications' ? 'Notification & recap controls' : activeTab === 'circles-management' ? 'Your community circles' : 'Circle & Privacy Parameters'}
         </h2>

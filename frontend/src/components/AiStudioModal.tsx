@@ -93,7 +93,7 @@ export default function AiStudioModal({
 
   const handlePickCustomPhoto = async (file: File) => {
     try {
-      const res = await api.uploadLocal(file);
+      const res = await api.uploadMedia(file);
       setSourceImageUrl(res.publicUrl);
       setRemasteredUrl(null);
     } catch (e: any) {
@@ -103,6 +103,7 @@ export default function AiStudioModal({
 
   return (
     <div
+      className="zq-ai-studio-overlay"
       onClick={onClose}
       style={{
         position: 'fixed',
@@ -118,6 +119,7 @@ export default function AiStudioModal({
       }}
     >
       <div
+        className="zq-ai-studio-modal"
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'linear-gradient(180deg, #13172c 0%, #090b16 100%)',
@@ -249,7 +251,7 @@ export default function AiStudioModal({
         </div>
 
         {/* Tab Content Area */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+        <div className="zq-ai-studio-content" style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
           {/* TAB 1: TEXT TO IMAGE GENERATION */}
           {activeTab === 'generate' && (
             <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
@@ -557,6 +559,9 @@ export default function AiStudioModal({
                       <div style={{ fontSize: '11px', color: '#9499ab' }}>AI will analyze facial geometry & style parameters</div>
                     </div>
                   </div>
+                  <p style={{ margin: '8px 2px 0', fontSize: '11px', lineHeight: 1.5, color: '#b8c3d8' }}>
+                    Remastering sends this photo to Pollinations AI for processing. Only use images you have permission to share.
+                  </p>
                 </div>
 
                 {/* Target Gender / Persona for Remaster */}

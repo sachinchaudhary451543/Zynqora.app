@@ -24,6 +24,7 @@ export default function ChatPage() {
   const [callHistory, setCallHistory] = useState<Array<{ type: string; direction: string; status: string; at: string }>>([]);
   const [chatNotice, setChatNotice] = useState('');
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  const realtimeSocketRef = useRef<ReturnType<typeof createRealtimeSocket> | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const latestMessageIdRef = useRef<string | undefined>(undefined);
   const appendMessages = (incoming: any[]) => {
@@ -50,24 +51,13 @@ export default function ChatPage() {
 
   useEffect(() => {
     const socket = createRealtimeSocket();
+    realtimeSocketRef.current = socket;
     socket.on('presence:online', ({ userId }: { userId: string }) => setOnlineUsers((current) => new Set(current).add(userId)));
     socket.on('presence:offline', ({ userId }: { userId: string }) => setOnlineUsers((current) => { const next = new Set(current); next.delete(userId); return next; }));
-    socket.on('call:incoming', (call: { fromUserId: string; callId: string; callType: 'audio' | 'video' }) => {
-      const accepted = window.confirm(`Incoming ${call.callType} call. Accept?`);
-      if (accepted) {
-        recordCall({ type: call.callType, direction: 'Incoming', status: 'Accepted' });
-        setActiveCall({
-          peer: { id: call.fromUserId, username: 'Zynqora caller', name: 'Zynqora caller' },
-          type: call.callType,
-          callId: call.callId,
-          initiator: false,
-        });
-      } else {
-        recordCall({ type: call.callType, direction: 'Incoming', status: 'Missed' });
-        socket.emit('call:end', { targetUserId: call.fromUserId, callId: call.callId });
-      }
-    });
-    return () => { socket.disconnect(); };
+    return () => {
+      socket.disconnect();
+      if (realtimeSocketRef.current === socket) realtimeSocketRef.current = null;
+    };
   }, [activeUsername, user?.id]);
 
   useEffect(() => {
@@ -212,6 +202,7 @@ export default function ChatPage() {
         boxShadow: isMobile ? 'none' : '0 24px 64px rgba(0,0,0,0.6), 0 0 40px rgba(121, 40, 202, 0.15)',
       }}
     >
+      <h1 className="zq-sr-only">Messages</h1>
       {/* 1. Left Conversations Sidebar */}
       {showSidebar && (
         <div
@@ -707,6 +698,8 @@ export default function ChatPage() {
           callType={activeCall.type}
           callId={activeCall.callId}
           initiator={activeCall.initiator}
+          currentUserId={user?.id || ''}
+          onDeclineCall={() => realtimeSocketRef.current?.emit('call:end', { targetUserId: activeCall.peer.id, callId: activeCall.callId })}
           onEndCall={() => { recordCall({ type: activeCall.type, direction: activeCall.initiator === false ? 'Incoming' : 'Outgoing', status: 'Ended' }); setActiveCall(null); }}
         />
       )}

@@ -114,6 +114,7 @@ export default function Feed() {
     <div className="zq-feed-container">
       {/* Main Stream Column */}
       <div className="zq-feed-stream">
+        <h1 className="zq-sr-only">Your Feed</h1>
         {/* Community Circles (Qoras) Bar */}
         <CommunityCirclesBar selectedId={selectedCircle} onSelect={selectCircle} />
 

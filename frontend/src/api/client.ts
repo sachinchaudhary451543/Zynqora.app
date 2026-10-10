@@ -1,14 +1,4 @@
-// Keep production auth/data requests on the deployed API even if the host omits build-time env vars.
-const API_BASE = import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? 'http://localhost:3000/api' : 'https://zynqora-api.onrender.com/api');
-
-function getApiOrigin() {
-  try {
-    const apiOrigin = getApiOrigin();
-    throw new Error(`Cannot connect to the backend at ${apiOrigin}. Please try again or contact support if the service is unavailable.`);
-  } catch {
-    return 'http://localhost:3000';
-  }
-}
+import { API_BASE, API_ORIGIN } from './config';
 
 export function getDefaultAvatar(nameOrUsername?: string | null): string {
   const seed = (nameOrUsername || 'Zynqora User').trim();
@@ -43,7 +33,7 @@ export function resolveMediaUrl(url?: string | null): string {
     return url;
   }
   if (url.startsWith('/uploads/')) {
-    return `${getApiOrigin()}${url}`;
+    return `${API_ORIGIN}${url}`;
   }
   return url;
 }
@@ -442,6 +432,23 @@ export const api = {
       if (!r.ok) throw new Error((await parseError(r)) || 'Upload failed');
       return r.json();
     });
+  },
+  uploadMedia: async (file: File): Promise<{ key?: string; publicUrl: string }> => {
+    const upload = await api.presignUpload(file.name, file.type || 'application/octet-stream');
+    if (upload.method !== 'PUT') {
+      const localUpload = await api.uploadLocal(file);
+      return { ...localUpload, publicUrl: resolveMediaUrl(localUpload.publicUrl) };
+    }
+
+    const response = await fetch(upload.uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    });
+    if (!response.ok) {
+      throw new Error(`Media upload failed (${response.status}). Please try again.`);
+    }
+    return { key: upload.key, publicUrl: upload.publicUrl };
   },
   processMedia: (payload: any): Promise<{ publicUrl?: string; processedPath?: string }> =>
     request('/uploads/process', { method: 'POST', body: JSON.stringify(payload) }),

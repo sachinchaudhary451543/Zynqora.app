@@ -16,6 +16,8 @@ const CreatePostModal = React.lazy(() => import('./components/CreatePostModal'))
 import Sidebar from './components/Sidebar';
 import FloatingMessagesWidget from './components/FloatingMessagesWidget';
 import AuthNotice from './components/AuthNotice';
+import { createRealtimeSocket } from './realtime';
+const LiveCallModal = React.lazy(() => import('./components/LiveCallModal'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -28,6 +30,8 @@ export default function App() {
   const location = useLocation();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState(() => localStorage.getItem('pendingRecoveryCode') || '');
+  const [incomingCall, setIncomingCall] = useState<{ peer: { id: string; username: string; name: string }; type: 'audio' | 'video'; callId: string } | null>(null);
+  const realtimeSocketRef = React.useRef<ReturnType<typeof createRealtimeSocket> | null>(null);
 
   React.useEffect(() => {
     document.documentElement.dataset.theme = localStorage.getItem('zynqora-theme') === 'dark' ? 'dark' : 'light';
@@ -38,6 +42,26 @@ export default function App() {
     window.addEventListener('recovery-code-created', refresh);
     return () => window.removeEventListener('recovery-code-created', refresh);
   }, []);
+
+  React.useEffect(() => {
+    if (!user) return;
+    const socket = createRealtimeSocket();
+    realtimeSocketRef.current = socket;
+    socket.on('call:incoming', (call: { fromUserId: string; callId: string; callType: 'audio' | 'video' }) => {
+      setIncomingCall({
+        peer: { id: call.fromUserId, username: 'Zynqora caller', name: 'Zynqora caller' },
+        type: call.callType,
+        callId: call.callId,
+      });
+    });
+    socket.on('call:ended', ({ callId }: { callId: string }) => {
+      setIncomingCall((current) => current?.callId === callId ? null : current);
+    });
+    return () => {
+      socket.disconnect();
+      if (realtimeSocketRef.current === socket) realtimeSocketRef.current = null;
+    };
+  }, [user?.id]);
 
   if (isInitializing) {
     return (
@@ -52,13 +76,14 @@ export default function App() {
 
   return (
     <div className="zq-app-layout">
+      <a className="zq-skip-link" href="#zq-main-content">Skip to Main Content</a>
       {/* Persistent Left Navigation Sidebar for authenticated users */}
       {user && !isAuthPage && (
         <Sidebar onOpenCreateModal={() => setIsCreateModalOpen(true)} unreadCount={4} />
       )}
 
       {/* Main Page Content */}
-      <main className={user && !isAuthPage ? 'zq-main-content' : ''} style={{ flex: 1 }}>
+      <main id="zq-main-content" tabIndex={-1} className={user && !isAuthPage ? 'zq-main-content' : ''} style={{ flex: 1 }}>
         <Suspense fallback={<div className="zq-route-loading">Loading your space...</div>}>
           <Routes>
           <Route path="/login" element={user ? <Navigate to="/feed" replace /> : <Login />} />
@@ -190,6 +215,19 @@ export default function App() {
             onPostCreated={() => {
               window.dispatchEvent(new CustomEvent('ig-post-created'));
             }}
+          />
+        </Suspense>
+      )}
+      {user && incomingCall && (
+        <Suspense fallback={<div className="zq-route-loading">Opening call…</div>}>
+          <LiveCallModal
+            peer={incomingCall.peer}
+            callType={incomingCall.type}
+            callId={incomingCall.callId}
+            initiator={false}
+            currentUserId={user.id}
+            onDeclineCall={() => realtimeSocketRef.current?.emit('call:end', { targetUserId: incomingCall.peer.id, callId: incomingCall.callId })}
+            onEndCall={() => setIncomingCall(null)}
           />
         </Suspense>
       )}
