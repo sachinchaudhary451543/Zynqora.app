@@ -44,7 +44,9 @@ describe('UploadsService AI remaster', () => {
     const requestUrl = new URL(requestedUrl);
     assert.equal(requestUrl.hostname, 'image.pollinations.ai');
     assert.equal(requestUrl.searchParams.get('seed'), '42');
-    assert.equal(requestUrl.searchParams.get('private'), 'true');
+    assert.equal(requestUrl.searchParams.get('model'), 'turbo');
+    assert.equal(requestUrl.searchParams.has('private'), false);
+    assert.equal(requestUrl.searchParams.has('nologo'), false);
     assert.match(decodeURIComponent(requestUrl.pathname), /A friendly robot in a garden/);
     assert.equal(readFileSync(join(tempUploadsDir, result.key!)).length, 1400);
     assert.equal(result.prompt?.includes('A friendly robot in a garden'), true);
@@ -76,10 +78,26 @@ describe('UploadsService AI remaster', () => {
     assert.equal(imageRequests.length, 1);
     const remasterRequest = new URL(imageRequests[0]);
     assert.match(remasterRequest.searchParams.get('image') || '', /^data:image\/jpeg;base64,/);
-    assert.equal(remasterRequest.searchParams.get('private'), 'true');
+    assert.equal(remasterRequest.searchParams.get('model'), 'turbo');
+    assert.equal(remasterRequest.searchParams.has('private'), false);
+    assert.equal(remasterRequest.searchParams.has('nologo'), false);
     assert.match(decodeURIComponent(remasterRequest.pathname), /preserve the identity/);
     assert.equal(readFileSync(join(tempUploadsDir, result.key!)).length, 1400);
     assert.equal(result.prompt?.includes('Add warm studio lighting'), true);
+  });
+
+  it('explains provider rejections without calling them temporary network failures', async () => {
+    for (const key of Object.keys(originalStorageEnvironment)) delete process.env[key];
+    globalThis.fetch = (async () => new Response('{}', { status: 402 })) as typeof fetch;
+
+    const service = new UploadsService();
+    tempUploadsDir = mkdtempSync(join(tmpdir(), 'zynqora-ai-capacity-'));
+    service['uploadsDir'] = tempUploadsDir;
+
+    await assert.rejects(
+      service.generateRealisticAi('A friendly robot in a garden'),
+      /free AI image provider rejected this request/,
+    );
   });
 
   it('builds encoded public URLs for objects in Supabase Storage', () => {

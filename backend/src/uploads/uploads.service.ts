@@ -220,7 +220,13 @@ export class UploadsService {
     // Build enhanced prompt
     const finalPromptText = `${stylePrefix}${genderPrefix}${userPrompt}${styleSuffix}`;
     const fullPrompt = encodeURIComponent(finalPromptText);
-    const aiEngineUrl = `https://image.pollinations.ai/prompt/${fullPrompt}?width=768&height=768&seed=${rawSeed}&nologo=true&private=true`;
+    const query = new URLSearchParams({
+      width: '768',
+      height: '768',
+      seed: String(rawSeed),
+      model: 'turbo',
+    });
+    const aiEngineUrl = `https://image.pollinations.ai/prompt/${fullPrompt}?${query.toString()}`;
 
     logger.log(`Generating AI image: seed=${rawSeed}`);
 
@@ -247,6 +253,9 @@ export class UploadsService {
       }
     } catch (e: any) {
       logger.warn(`Pollinations generator failed: ${e.message}`);
+      if (e instanceof Error && e.message.includes('status 402')) {
+        throw new ServiceUnavailableException('The free AI image provider rejected this request. Please try again later.');
+      }
       throw new ServiceUnavailableException('AI image generation is temporarily unavailable. Please try again.');
     }
   }
@@ -288,8 +297,7 @@ export class UploadsService {
       image: imageReference,
       width: '768',
       height: '768',
-      nologo: 'true',
-      private: 'true',
+      model: 'turbo',
       seed: String(Math.floor(Math.random() * 1000000)),
     });
     const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${query.toString()}`;
@@ -310,6 +318,9 @@ export class UploadsService {
       }
     } catch (error) {
       logger.warn(`Pollinations image remaster failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+      if (error instanceof Error && error.message.includes('status 402')) {
+        throw new ServiceUnavailableException('The free AI image provider rejected this request. Please try again later.');
+      }
       throw new ServiceUnavailableException('AI photo remastering is temporarily unavailable. Please try again.');
     }
   }

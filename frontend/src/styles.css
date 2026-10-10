@@ -88,6 +88,7 @@ body {
 [data-theme='light'] .zq-nav-item.active { color: #063c57; background: rgba(72,205,245,.18); }
 [data-theme='light'] .zq-text-secondary { color: #4e6b7d; }
 [data-theme='light'] h1, [data-theme='light'] h2, [data-theme='light'] h3, [data-theme='light'] h4, [data-theme='light'] h5 { color: var(--zq-text-primary) !important; }
+[data-theme='light'] .zq-circles-hero h1 { color: #f5f9ff !important; }
 [data-theme='light'] .zq-post-card, [data-theme='light'] .zq-chat-page-wrap, [data-theme='light'] .zq-settings-page { color: var(--zq-text-primary); }
 [data-theme='light'] .zq-sidebar,
 [data-theme='light'] .zq-circles-bar,

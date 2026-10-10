@@ -42,7 +42,17 @@ export function getAvatarUrl(user?: { username?: string | null; name?: string | 
   if (!user) return getDefaultAvatar('Z');
   const img = user.profileImage || user.avatarUrl;
   if (!img || img === '/placeholder-avatar.png') return getDefaultAvatar(user.name || user.username);
-  return resolveMediaUrl(img);
+  const resolved = resolveMediaUrl(img);
+  try {
+    const hostname = new URL(resolved).hostname;
+    if (new URL(resolved).pathname.startsWith('/uploads/') &&
+      (hostname.endsWith('.onrender.com') || hostname.endsWith('.up.railway.app'))) {
+      return getDefaultAvatar(user.name || user.username);
+    }
+  } catch {
+    return getDefaultAvatar(user.name || user.username);
+  }
+  return resolved;
 }
 
 export function normalizeConnectionUsers(records: any[] | undefined, relation: 'follower' | 'following') {

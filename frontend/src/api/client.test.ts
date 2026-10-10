@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { api, getDefaultAvatar, normalizeConnectionUsers, resolveMediaUrl } from './client';
+import { api, getAvatarUrl, getDefaultAvatar, normalizeConnectionUsers, resolveMediaUrl } from './client';
 
 describe('api client helpers', () => {
   it('resolves local upload paths against the API origin', () => {
@@ -22,6 +22,19 @@ describe('api client helpers', () => {
     const first = getDefaultAvatar('Alex');
     expect(first).toMatch(/^data:image\/svg\+xml;utf8,/);
     expect(getDefaultAvatar('Alex')).toBe(first);
+  });
+
+  it('uses a generated avatar for legacy uploads on ephemeral production hosts', () => {
+    expect(getAvatarUrl({
+      name: 'Alex',
+      username: 'alex',
+      avatarUrl: 'https://zynqora-api.onrender.com/uploads/old-photo.jpg',
+    })).toBe(getDefaultAvatar('Alex'));
+    expect(getAvatarUrl({
+      name: 'Alex',
+      username: 'alex',
+      avatarUrl: 'https://cdn.example.com/uploads/photo.jpg',
+    })).toBe('https://cdn.example.com/uploads/photo.jpg');
   });
 
   it('uploads media through the signed URL and rejects failed storage responses', async () => {
